@@ -122,9 +122,6 @@ if st.button("توليد الصوت الآن 🔊"):
     else:
         st.warning("يرجى كتابة النص أولاً.")
 
-    else:
-        st.warning("يرجى كتابة النص أولاً.")
-
 import streamlit as st
 from gradio_client import Client, handle_file
 
