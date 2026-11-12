@@ -77,47 +77,51 @@ if st.button("✨ اصنع الفيديو الآن", type="primary", use_contain
                 )
             except Exception as e:
                 st.error(f"حدث خطأ أثناء التوليد: {e}")
-import streamlit as st
-import requests
+import edge_tts
+import asyncio
 
 st.divider()
-st.header("🗣️ التحدث بصوتي المستنسخ")
+st.header("🎙️ استوديو التعليق الصوتي (الإنجليزية)")
 
-# ضع هنا مفتاح API الخاص بك ومعرف صوتك المستنسخ من ElevenLabs
-ELEVENLABS_API_KEY = "ضع_مفتاح_API_هنا"
-VOICE_ID = "ضع_معرف_صوتك_هنا"
+# اختيار الصوت الإنجليزي المناسب للفيديو
+voices = {
+    "رجل حماسي - أمريكي (Christopher)": "en-US-ChristopherNeural",
+    "رجل عميق - أمريكي (Guy)": "en-US-GuyNeural",
+    "امرأة واضحة - أمريكية (Jenny)": "en-US-JennyNeural",
+    "رجل بريطاني - احترافي (Ryan)": "en-GB-RyanNeural"
+}
 
-cloned_text = st.text_area("اكتب النص ليتم قراءته بصوتك الشخصي:", height=100)
+selected_voice = st.selectbox("اختر نبرة الصوت:", list(voices.keys()))
+voice_code = voices[selected_voice]
 
-if st.button("توليد بصوتي المستنسخ 🎙️"):
-    if cloned_text.strip():
-        with st.spinner("جاري التوليد بصوتك..."):
-            url = f"https://elevenlabs.io{VOICE_ID}"
-            headers = {
-                "Accept": "audio/mpeg",
-                "Content-Type": "application/json",
-                "xi-api-key": ELEVENLABS_API_KEY
-            }
-            data = {
-                "text": cloned_text,
-                "model_id": "eleven_multilingual_v2", # يدعم الإنجليزية والإيطالية والعربية بصوتك
-                "voice_settings": {
-                    "stability": 0.5,
-                    "similarity_boost": 0.8
-                }
-            }
-            
-            response = requests.post(url, json=data, headers=headers)
-            
-            if response.status_code == 200:
-                with open("my_cloned_voice.mp3", "wb") as f:
-                    f.write(response.content)
-                st.success("تم التوليد بصوتك بنجاح!")
-                st.audio("my_cloned_voice.mp3", format="audio/mp3")
-                with open("my_cloned_voice.mp3", "rb") as file:
-                    st.download_button("📥 تحميل الصوت المستنسخ", file, "my_voice.mp3", "audio/mp3")
-            else:
-                st.error("حدث خطأ في الاتصال، تأكد من مفتاح API والرصيد.")
+# خانة النص الإنجليزي
+text_to_speak = st.text_area(
+    "ضع النص الإنجليزي هنا:",
+    value="Look at this completely abandoned backyard... covered in weeds and dead leaves. Can we bring it back to life? Watch the full transformation!",
+    height=100
+)
+
+async def make_audio(text, voice, filename):
+    communicate = edge_tts.Communicate(text, voice)
+    await communicate.save(filename)
+
+if st.button("توليد الصوت الآن 🔊"):
+    if text_to_speak.strip():
+        with st.spinner("جاري توليد الصوت..."):
+            output_file = "voiceover.mp3"
+            asyncio.run(make_audio(text_to_speak, voice_code, output_file))
+            st.success("تم توليد الصوت بنجاح!")
+            st.audio(output_file, format="audio/mp3")
+            with open(output_file, "rb") as f:
+                st.download_button(
+                    label="📥 تحميل الملف الصوتي (MP3)",
+                    data=f,
+                    file_name="voiceover.mp3",
+                    mime="audio/mp3"
+                )
+    else:
+        st.warning("يرجى كتابة النص أولاً.")
+
     else:
         st.warning("يرجى كتابة النص أولاً.")
 
