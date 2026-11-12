@@ -5,6 +5,24 @@ import xai_sdk
 
 st.set_page_config(page_title="استوديو توليد الفيديو", page_icon="🎬", layout="centered")
 
+# --- نظام الحماية بكلمة مرور خاصة ---
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.title("🔒 استوديو خاص")
+    st.write("الرجاء إدخال كلمة المرور السرية للدخول:")
+    password_input = st.text_input("كلمة المرور:", type="password")
+    
+    if st.button("دخول", type="primary"):
+        if "APP_PASSWORD" in st.secrets and password_input == st.secrets["APP_PASSWORD"]:
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.error("❌ كلمة المرور غير صحيحة!")
+    st.stop()
+# ------------------------------------
+
 st.title("🎬 استوديو توليد الفيديو الخاص بي")
 st.write("مدعوم بمحرك Grok Imagine من شركة xAI")
 
@@ -22,9 +40,9 @@ prompt = st.text_area(
 
 col1, col2 = st.columns(2)
 with col1:
-    duration = st.selectbox("مدة الفيديو (بالثواني):", (5, 10), index=0)
+    duration = st.selectbox("مدة الفيديو (بالثواني):", [5, 10], index=0)
 with col2:
-    aspect_ratio = st.selectbox("أبعاد الفيديو:", ("16:9 (يوتيوب / عرضي)", "9:16 (تيك توك / طولي)", "1:1 (مربع)"))
+    aspect_ratio = st.selectbox("أبعاد الفيديو:", ["16:9 (يوتيوب / عرضي)", "9:16 (تيك توك / طولي)", "1:1 (مربع)"])
 
 ratio_code = aspect_ratio.split(" ")[0]
 
