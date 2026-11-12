@@ -12,14 +12,14 @@ if "authenticated" not in st.session_state:
 if not st.session_state.authenticated:
     st.title("🔒 استوديو خاص")
     st.write("الرجاء إدخال كلمة المرور السرية للدخول:")
-    password_input = st.text_input(Borgo2026@:", type="password")
+    password_input = st.text_input("كلمة المرور:", type="password")
     
     if st.button("دخول", type="primary"):
         if "APP_PASSWORD" in st.secrets and password_input == st.secrets["APP_PASSWORD"]:
             st.session_state.authenticated = True
             st.rerun()
         else:
-            st.error("Borgo2026@!")
+            st.error("❌ كلمة المرور غير صحيحة!")
     st.stop()
 # ------------------------------------
 
@@ -29,7 +29,7 @@ st.write("مدعوم بمحرك Grok Imagine من شركة xAI")
 if "XAI_API_KEY" in st.secrets:
     os.environ["XAI_API_KEY"] = st.secrets["XAI_API_KEY"]
 else:
-    st.error("Borgo2026@ XAI_API_KEY في إعدادات Secrets الخاصة بالموقع أولاً.")
+    st.error("⚠️ يرجى إضافة مفتاح XAI_API_KEY في إعدادات Secrets الخاصة بالموقع أولاً.")
     st.stop()
 
 prompt = st.text_area(
