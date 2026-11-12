@@ -1,166 +1,288 @@
+
+import asyncio
+import io
 import os
+import urllib.parse
+import edge_tts
+from moviepy.editor import AudioFileClip, ImageClip, concatenate_videoclips
+import numpy as np
+from PIL import Image, ImageFilter
+from rembg import remove
 import requests
 import streamlit as st
-import xai_sdk
-from gradio_client import client, handle_file
 
-st.set_page_config(page_title="استوديو توليد الفيديو", page_icon="🎬", layout="centered")
+st.set_page_config(page_title="Ago Italy AI Studio", page_icon="🚀", layout="wide")
 
-# --- نظام الحماية بكلمة مرور خاصة ---
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-if not st.session_state.authenticated:
-    st.title("🔒 استوديو خاص")
-    st.write("الرجاء إدخال كلمة المرور السرية للدخول:")
-    password_input = st.text_input("كلمة المرور:", type="password")
-    
-    if st.button("دخول", type="primary"):
-        if "APP_PASSWORD" in st.secrets and password_input == st.secrets["APP_PASSWORD"]:
-            st.session_state.authenticated = True
-            st.rerun()
-        else:
-            st.error("❌ كلمة المرور غير صحيحة!")
-    st.stop()
-# ------------------------------------
-
-st.title("🎬 استوديو توليد الفيديو الخاص بي")
-st.write("مدعوم بمحرك Grok Imagine من شركة xAI")
-
-if "XAI_API_KEY" in st.secrets:
-    os.environ["XAI_API_KEY"] = st.secrets["XAI_API_KEY"]
-else:
-    st.error("⚠️ يرجى إضافة مفتاح XAI_API_KEY في إعدادات Secrets الخاصة بالموقع أولاً.")
-    st.stop()
-
-prompt = st.text_area(
-    "اكتب وصف الفيديو الذي تتخيله (يفضل باللغة الإنجليزية لنتائج أدق):",
-    placeholder="مثال: A cinematic drone shot flying over snowy mountains at sunset, 4k resolution",
-    height=120
+st.title("🚀 استوديو الذكاء الاصطناعي المتكامل - Ago Italy")
+st.markdown(
+    "تجهيز صور المنتجات، الديكورات الفاخرة، التعليق الصوتي، وصناعة"
+    " الفيديوهات الإعلانية."
 )
 
-col1, col2 = st.columns(2)
-with col1:
-    duration = st.selectbox("مدة الفيديو (بالثواني):", [5, 10], index=0)
-with col2:
-    aspect_ratio = st.selectbox("أبعاد الفيديو:", ["16:9 (يوتيوب / عرضي)", "9:16 (تيك توك / طولي)", "1:1 (مربع)"])
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📸 1. مسح الخلفية",
+    "✨ 2. ديكور فاخر للمنتج",
+    "🎙️ 3. تعليق صوتي سريع",
+    "🎬 4. صانع الفيديو الإعلاني",
+])
 
-ratio_code = aspect_ratio.split(" ")[0]
+with tab1:
+  st.header("تجهيز صور المنتجات لمتجر Shopify (خلفية بيضاء)")
+  uploaded_files = st.file_uploader(
+      "ارفع صور أي منتج هنا (يمكنك رفع عدة صور دفعة واحدة):",
+      type=["png", "jpg", "jpeg", "webp"],
+      accept_multiple_files=True,
+      key="tab1_uploader",
+  )
 
-if st.button("✨ اصنع الفيديو الآن", type="primary", use_container_width=True):
-    if not prompt.strip():
-        st.warning("الرجاء كتابة وصف للفيديو أولاً!")
-    else:
-        with st.spinner("⏳ جاري صناعة الفيديو بواسطة الذكاء الاصطناعي... قد يستغرق الأمر من 30 إلى 60 ثانية"):
-            try:
-                client = xai_sdk.Client()
-                response = client.video.generate(
-                    prompt=prompt,
-                    model="grok-imagine-video",
-                    duration=duration,
-                    aspect_ratio=ratio_code,
-                    resolution="720p"
-                )
-                
-                video_url = response.url
-                st.success("🎉 تم صنع الفيديو بنجاح!")
-                
-                st.video(video_url)
-                
-                video_bytes = requests.get(video_url).content
-                st.download_button(
-                    label="⬇️ حفظ الفيديو في التابلت",
-                    data=video_bytes,
-                    file_name="my_ai_video.mp4",
-                    mime="video/mp4",
-                    use_container_width=True
-                )
-            except Exception as e:
-                st.error(f"حدث خطأ أثناء التوليد: {e}")
-import edge_tts
-import asyncio
+  if uploaded_files and st.button("✨ مسح الخلفية الآن"):
+    cols = st.columns(2)
+    for idx, file in enumerate(uploaded_files):
+      with st.spinner(f"جاري معالجة {file.name}..."):
+        cutout_bytes = remove(file.read())
+        img = Image.open(io.BytesIO(cutout_bytes)).convert("RGBA")
+        white_bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
+        final_img = Image.alpha_composite(white_bg, img).convert("RGB")
 
-st.divider()
-st.header("🎙️ استوديو التعليق الصوتي (الإنجليزية)")
+        buf = io.BytesIO()
+        final_img.save(buf, format="JPEG", quality=95)
 
-# اختيار الصوت الإنجليزي المناسب للفيديو
-voices = {
-    "رجل حماسي - أمريكي (Christopher)": "en-US-ChristopherNeural",
-    "رجل عميق - أمريكي (Guy)": "en-US-GuyNeural",
-    "امرأة واضحة - أمريكية (Jenny)": "en-US-JennyNeural",
-    "رجل بريطاني - احترافي (Ryan)": "en-GB-RyanNeural"
-}
+        with cols[idx % 2]:
+          st.image(final_img, caption=file.name, use_container_width=True)
+          st.download_button(
+              label=f"⬇️ تحميل الصورة ({file.name})",
+              data=buf.getvalue(),
+              file_name=f"clean_{os.path.splitext(file.name)[0]}.jpg",
+              mime="image/jpeg",
+              key=f"dl_clean_{idx}",
+          )
 
-selected_voice = st.selectbox("اختر نبرة الصوت:", list(voices.keys()))
-voice_code = voices[selected_voice]
+with tab2:
+  st.header("دمج منتجك الحقيقي في خلفية فاخرة بالذكاء الاصطناعي")
+  product_file = st.file_uploader(
+      "ارفع صورة المنتج الواضحة:",
+      type=["png", "jpg", "jpeg", "webp"],
+      key="tab2_uploader",
+  )
 
-# خانة النص الإنجليزي
-text_to_speak = st.text_area(
-    "ضع النص الإنجليزي هنا:",
-    value="Look at this completely abandoned backyard... covered in weeds and dead leaves. Can we bring it back to life? Watch the full transformation!",
-    height=100
-)
+  scene_presets = {
+      "طاولة رخامية فاخرة مع إضاءة شمس ناعمة": (
+          "luxury white marble table, soft warm sunlight shadows, minimalist"
+          " aesthetic background, high resolution product photography"
+      ),
+      "طاولة خشبية دافئة في غرفة معيشة عصرية": (
+          "warm oak wooden table in a modern cozy Italian living room, soft"
+          " blurred background, natural daylight"
+      ),
+      "مقهى إيطالي أنيق في ميلانو": (
+          "chic outdoor cafe table in Milan Italy, blurred background, golden"
+          " hour sunlight, editorial fashion photography"
+      ),
+      "منصة عرض استوديو احترافية (Podium)": (
+          "minimalist beige stone podium studio background, soft dramatic"
+          " lighting, commercial photography"
+      ),
+      "وصف مخصص (اكتب المكان الذي تريده بالأسفل)": "custom",
+  }
 
-async def make_audio(text, voice, filename):
+  selected_scene = st.selectbox(
+      "اختر المكان المناسب لمنتجك:", list(scene_presets.keys())
+  )
+  if scene_presets[selected_scene] == "custom":
+    scene_prompt = st.text_input(
+        "اكتب وصف الخلفية بالإنجليزية (مثال: luxury wooden table near a"
+        " window):",
+        "luxury marble table with soft lighting",
+    )
+  else:
+    scene_prompt = scene_presets[selected_scene]
+
+  if product_file and st.button("🎨 توليد المشهد ودمج المنتج"):
+    with st.spinner("جاري قص المنتج وتوليد الخلفية الفاخرة..."):
+      cutout_bytes = remove(product_file.read())
+      prod_img = Image.open(io.BytesIO(cutout_bytes)).convert("RGBA")
+
+      bbox = prod_img.getbbox()
+      if bbox:
+        prod_img = prod_img.crop(bbox)
+
+      encoded_prompt = urllib.parse.quote(scene_prompt)
+      bg_url = f"https://pollinations.ai{encoded_prompt}?width=1024&height=1024&nologo=true"
+      response = requests.get(bg_url, timeout=30)
+
+      if response.status_code == 200:
+        bg_img = (
+            Image.open(io.BytesIO(response.content))
+            .convert("RGBA")
+            .resize((1024, 1024))
+        )
+
+        max_size = 620
+        prod_img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+
+        pos_x = (1024 - prod_img.width) // 2
+        pos_y = (1024 - prod_img.height) // 2 + 40
+
+        shadow = Image.new("RGBA", prod_img.size, (0, 0, 0, 90))
+        shadow_mask = prod_img.split()[3]
+        shadow.putalpha(shadow_mask)
+        shadow = shadow.filter(ImageFilter.GaussianBlur(15))
+
+        bg_img.paste(shadow, (pos_x + 10, pos_y + 20), shadow)
+        bg_img.paste(prod_img, (pos_x, pos_y), prod_img)
+
+        final_scene = bg_img.convert("RGB")
+        st.image(
+            final_scene,
+            caption="النتيجة النهائية جاهزة للإعلان!",
+            use_container_width=True,
+        )
+
+        buf = io.BytesIO()
+        final_scene.save(buf, format="JPEG", quality=95)
+        st.download_button(
+            label="⬇️ تحميل الصورة الاحترافية",
+            data=buf.getvalue(),
+            file_name="ago_italy_luxury_scene.jpg",
+            mime="image/jpeg",
+        )
+      else:
+        st.error("حدث ضغط على خادم توليد الخلفيات، يرجى المحاولة مرة أخرى.")
+
+with tab3:
+  st.header("توليد التعليق الصوتي الفوري للإعلانات (بدون انتظار)")
+
+  voices = {
+      "🇮🇹 إيطالي - أنثى أنيقة (Elsa - للموضة والحقائب)": "it-IT-ElsaNeural",
+      "🇮🇹 إيطالي - أنثى حيوية (Isabella - للمنتجات المنزلية)": (
+          "it-IT-IsabellaNeural"
+      ),
+      "🇮🇹 إيطالي - رجل فخم (Diego)": "it-IT-DiegoNeural",
+      "🇸🇦 عربي خليجي/سعودي - أنثى (Zariyah)": "ar-SA-ZariyahNeural",
+      "🇸🇦 عربي خليجي/سعودي - رجل (Hamed)": "ar-SA-HamedNeural",
+      "🇦🇪 عربي إماراتي - أنثى (Fatima)": "ar-AE-FatimaNeural",
+      "🇪🇬 عربي عام - أنثى (Salma)": "ar-EG-SalmaNeural",
+      "🇬🇧 إنجليزي بريطاني - أنثى (Sonia - لأوروبا)": "en-GB-SoniaNeural",
+      "🇺🇸 إنجليزي أمريكي - أنثى (Jenny)": "en-US-JennyNeural",
+      "🇺🇸 إنجليزي أمريكي - رجل (Christopher)": "en-US-ChristopherNeural",
+  }
+
+  selected_voice_label = st.selectbox(
+      "اختر اللغة والصوت:", list(voices.keys())
+  )
+  selected_voice = voices[selected_voice_label]
+
+  script_text = st.text_area(
+      "اكتب نص الإعلان هنا بنفس لغة الصوت الذي اخترته:",
+      value=(
+          "Scopri la nuova collezione Ago Italy! Qualità garantita, spedizione"
+          " veloce e pagamento alla consegna."
+      ),
+      height=120,
+      key="tts_script",
+  )
+
+  async def create_tts(text, voice, out_path):
     communicate = edge_tts.Communicate(text, voice)
-    await communicate.save(filename)
+    await communicate.save(out_path)
 
-if st.button("توليد الصوت الآن 🔊"):
-    if text_to_speak.strip():
-        with st.spinner("جاري توليد الصوت..."):
-            output_file = "voiceover.mp3"
-            asyncio.run(make_audio(text_to_speak, voice_code, output_file))
-            st.success("تم توليد الصوت بنجاح!")
-            st.audio(output_file, format="audio/mp3")
-            with open(output_file, "rb") as f:
-                st.download_button(
-                    label="📥 تحميل الملف الصوتي (MP3)",
-                    data=f,
-                    file_name="voiceover.mp3",
-                    mime="audio/mp3"
-                )
+  if st.button("🎙️ توليد الصوت الآن"):
+    if script_text.strip():
+      with st.spinner("جاري تسجيل الصوت..."):
+        audio_filename = "generated_voice.mp3"
+        asyncio.run(create_tts(script_text, selected_voice, audio_filename))
+        with open(audio_filename, "rb") as f:
+          audio_bytes = f.read()
+        st.audio(audio_bytes, format="audio/mp3")
+        st.download_button(
+            label="⬇️ تحميل الملف الصوتي (MP3)",
+            data=audio_bytes,
+            file_name="ago_italy_audio.mp3",
+            mime="audio/mpeg",
+        )
     else:
-        st.warning("يرجى كتابة النص أولاً.")
+      st.warning("يرجى كتابة النص أولاً.")
 
-import streamlit as st
-from gradio_client import Client, handle_file
+with tab4:
+  st.header("صناعة فيديو إعلاني جاهز لفيسبوك وتيك توك")
+  st.markdown("ارفع من صورتين إلى 5 صور لمنتجك، وسيقوم التطبيق بتحريكها وتركيب الصوت عليها تلقائياً.")
 
-st.divider()
-st.header("🎙️ استنساخ صوتي مجاني (بدون حدود)")
+  video_images = st.file_uploader(
+      "ارفع صور المنتج بالترتيب:",
+      type=["png", "jpg", "jpeg"],
+      accept_multiple_files=True,
+      key="tab4_uploader",
+  )
+  video_audio = st.file_uploader(
+      "ارفع ملف الصوت (MP3 أو WAV) الذي ولدته في القسم السابق (اختياري):",
+      type=["mp3", "wav"],
+      key="tab4_audio",
+  )
 
-# رفع عينة من صوتك (10 إلى 15 ثانية بصيغة wav أو mp3)
-ref_audio = st.file_uploader("ارفع مقطعاً قصيراً بصوتك (10 ثوانٍ):", type=["mp3", "wav"])
-ref_text = st.text_input("اكتب الكلام الموجود في المقطع الصوتي الذي رفعته (اختياري):")
-target_text = st.text_area("اكتب النص الجديد الذي تريد أن ينطقه بصوتك:", height=100)
+  aspect_ratio = st.radio(
+      "اختر مقاس الفيديو:",
+      [
+          "📱 عمودي 9:16 (TikTok / Reels / Facebook Ads)",
+          "💻 عرضي 16:9 (YouTube / الموقع)",
+      ],
+  )
+  target_size = (720, 1280) if "9:16" in aspect_ratio else (1280, 720)
 
-if st.button("استنساخ الصوت وتوليده مجاناً 🚀"):
-    if ref_audio is not None and target_text.strip():
-        with st.spinner("جاري استنساخ صوتك عبر السحابة المجانية..."):
-            try:
-                # حفظ الملف المرفوع مؤقتاً
-                with open("temp_ref.wav", "wb") as f:
-                    f.write(ref_audio.getbuffer())
-                
-                # الاتصال بنموذج F5-TTS المجاني على Hugging Face
-                client = Client("mrfakename/E2-F5-TTS")
-                result = client.predict(
-                    ref_audio_input=handle_file("temp_ref.wav"),
-                    ref_text_input=ref_text,
-                    gen_text_input=target_text,
-                    remove_silence=True,
-                    api_name="/basic_tts"
-                )
-                
-                # النتيجة تعود كمسار للملف الصوتي
-                audio_output = result[0] if isinstance(result, (list, tuple)) else result
-                
-                st.success("تم استنساخ صوتك بنجاح ومجاناً!")
-                st.audio(audio_output)
-                
-                with open(audio_output, "rb") as file:
-                    st.download_button("📥 تحميل الصوت المستنسخ", file, "cloned_voice.wav", "audio/wav")
-                    
-            except Exception as e:
-                st.error(f"السيرفر المجاني مزدحم حالياً، حاول مرة أخرى بعد قليل. التفاصيل: {e}")
-    else:
-        st.warning("يرجى رفع ملف صوتي وكتابة النص المطلوب.")
+  if video_images and st.button("🎬 صناعة الفيديو الإعلاني الآن"):
+    with st.spinner("جاري مونتاج الفيديو وإضافة الحركة والصوت..."):
+      clips = []
+      audio_clip = None
+      total_duration = len(video_images) * 3.0
+
+      if video_audio:
+        ext = os.path.splitext(video_audio.name)[1]
+        temp_aud_name = f"temp_audio{ext}"
+        with open(temp_aud_name, "wb") as f:
+          f.write(video_audio.read())
+        audio_clip = AudioFileClip(temp_aud_name)
+        total_duration = audio_clip.duration
+
+      duration_per_img = total_duration / len(video_images)
+
+      for idx, img_file in enumerate(video_images):
+        pil_img = Image.open(img_file).convert("RGB")
+        bg = pil_img.resize(target_size).filter(ImageFilter.GaussianBlur(30))
+        pil_img.thumbnail(
+            (target_size[0], int(target_size[1] * 0.8)),
+            Image.Resampling.LANCZOS,
+        )
+        paste_x = (target_size[0] - pil_img.width) // 2
+        paste_y = (target_size[1] - pil_img.height) // 2
+        bg.paste(pil_img, (paste_x, paste_y))
+
+        temp_img_path = f"frame_{idx}.jpg"
+        bg.save(temp_img_path, quality=90)
+
+        clip = (
+            ImageClip(temp_img_path)
+            .set_duration(duration_per_img)
+            .resize(lambda t: 1 + 0.04 * t)
+        )
+        clips.append(clip)
+
+      final_video = concatenate_videoclips(clips, method="compose")
+      if audio_clip:
+        final_video = final_video.set_audio(audio_clip)
+
+      output_video_path = "ago_italy_ad.mp4"
+      final_video.write_videofile(
+          output_video_path,
+          fps=24,
+          codec="libx264",
+          audio_codec="aac",
+          verbose=False,
+          logger=None,
+      )
+
+      with open(output_video_path, "rb") as v_file:
+        video_bytes = v_file.read()
+        st.video(video_bytes)
+        st.download_button(
+            label="⬇️ تحميل الفيديو الإعلاني الجاهز (MP4)",
+            data=video_bytes,
+            file_name="ago_italy_ad.mp4",
