@@ -2,3 +2,4 @@ streamlit
 xai-sdk
 requests
 gradio_client
+edge-tts
