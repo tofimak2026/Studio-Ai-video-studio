@@ -29,7 +29,7 @@ st.write("مدعوم بمحرك Grok Imagine من شركة xAI")
 if "XAI_API_KEY" in st.secrets:
     os.environ["XAI_API_KEY"] = st.secrets["XAI_API_KEY"]
 else:
-    st.error("⚠️ يرجى إضافة مفتاح XAI_API_KEY في إعدادات Secrets الخاصة بالموقع أولاً.")
+    st.error("Borgo2026@ XAI_API_KEY في إعدادات Secrets الخاصة بالموقع أولاً.")
     st.stop()
 
 prompt = st.text_area(
