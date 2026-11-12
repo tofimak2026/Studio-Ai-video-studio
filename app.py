@@ -12,14 +12,14 @@ if "authenticated" not in st.session_state:
 if not st.session_state.authenticated:
     st.title("🔒 استوديو خاص")
     st.write("الرجاء إدخال كلمة المرور السرية للدخول:")
-    password_input = st.text_input("كلمة المرور:", type="password")
+    password_input = st.text_input(كلمة المرور:", type="password")
     
     if st.button("دخول", type="primary"):
         if "APP_PASSWORD" in st.secrets and password_input == st.secrets["APP_PASSWORD"]:
             st.session_state.authenticated = True
             st.rerun()
         else:
-            st.error("❌ كلمة المرور غير صحيحة!")
+            st.error("Borgo2026@!")
     st.stop()
 # ------------------------------------
 
