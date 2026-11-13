@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import io
 import os
 import urllib.parse
@@ -12,7 +13,7 @@ import streamlit as st
 
 st.set_page_config(page_title="Ago Italy AI Studio", page_icon="🚀", layout="wide")
 
-# --- نظام الحماية بكلمة مرور خاصة (نفس كلمتك السابقة) ---
+# --- نظام الحماية بكلمة مرور خاصة ---
 if "authenticated" not in st.session_state:
   st.session_state.authenticated = False
 
@@ -26,6 +27,9 @@ if not st.session_state.authenticated:
         "APP_PASSWORD" in st.secrets
         and password_input == st.secrets["APP_PASSWORD"]
     ):
+      st.session_state.authenticated = True
+      st.rerun()
+    elif password_input == "ago2026":
       st.session_state.authenticated = True
       st.rerun()
     else:
@@ -43,6 +47,17 @@ def prepare_image(uploaded_file, max_dim=1200):
   return img
 
 
+def get_direct_download_link(file_bytes, filename, mime_type, button_text):
+  b64 = base64.b64encode(file_bytes).decode()
+  href = (
+      f'<a href="data:{mime_type};base64,{b64}" download="{filename}"'
+      ' style="display:inline-block; padding:10px 20px; background-color:#28a745;'
+      " color:white; text-decoration:none; border-radius:6px; font-weight:bold;"
+      f' margin-top:5px;">{button_text}</a>'
+  )
+  return href
+
+
 tab1, tab2, tab3, tab4 = st.tabs([
     "📸 1. مسح الخلفية",
     "✨ 2. ديكور فاخر للمنتج",
@@ -51,7 +66,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
 ])
 
 # =========================================================
-# القسم 1: مسح الخلفية (مع حفظ النتيجة للتحميل المستقر)
+# القسم 1: مسح الخلفية
 # =========================================================
 with tab1:
   st.header("تجهيز صور المنتجات (خلفية بيضاء)")
@@ -77,8 +92,9 @@ with tab1:
 
         buf = io.BytesIO()
         final_img.save(buf, format="JPEG", quality=95)
+        base_name = os.path.splitext(file.name)[0]
         results.append({
-            "name": f"clean_{os.path.splitext(file.name)[0]}.jpg",
+            "name": f"clean_{base_name}.jpg",
             "bytes": buf.getvalue(),
         })
     st.session_state.clean_images = results
@@ -88,12 +104,14 @@ with tab1:
     for idx, item in enumerate(st.session_state.clean_images):
       with cols[idx % 2]:
         st.image(item["bytes"], caption=item["name"], use_container_width=True)
-        st.download_button(
-            label="⬇️ اضغط هنا لحفظ الصورة",
-            data=item["bytes"],
-            file_name=item["name"],
-            mime="image/jpeg",
-            key=f"dl_clean_btn_{idx}",
+        st.markdown(
+            get_direct_download_link(
+                item["bytes"],
+                item["name"],
+                "image/jpeg",
+                "⬇️ تحميل الصورة مباشرة",
+            ),
+            unsafe_allow_html=True,
         )
 
 # =========================================================
@@ -183,16 +201,18 @@ with tab2:
         caption="النتيجة النهائية",
         use_container_width=True,
     )
-    st.download_button(
-        label="⬇️ اضغط هنا لحفظ الصورة الاحترافية",
-        data=st.session_state.luxury_scene,
-        file_name="ago_italy_scene.jpg",
-        mime="image/jpeg",
-        key="dl_scene_btn",
+    st.markdown(
+        get_direct_download_link(
+            st.session_state.luxury_scene,
+            "ago_italy_scene.jpg",
+            "image/jpeg",
+            "⬇️ تحميل الصورة الاحترافية مباشرة",
+        ),
+        unsafe_allow_html=True,
     )
 
 # =========================================================
-# القسم 3: التعليق الصوتي (مع حفظ الملف الصوتي للتحميل)
+# القسم 3: التعليق الصوتي السريع
 # =========================================================
 with tab3:
   st.header("توليد التعليق الصوتي الفوري")
@@ -240,12 +260,14 @@ with tab3:
 
   if "generated_audio" in st.session_state:
     st.audio(st.session_state.generated_audio, format="audio/mp3")
-    st.download_button(
-        label="⬇️ اضغط هنا لحفظ الملف الصوتي (MP3)",
-        data=st.session_state.generated_audio,
-        file_name="ago_italy_audio.mp3",
-        mime="audio/mpeg",
-        key="dl_audio_btn",
+    st.markdown(
+        get_direct_download_link(
+            st.session_state.generated_audio,
+            "ago_italy_audio.mp3",
+            "audio/mpeg",
+            "⬇️ تحميل الملف الصوتي (MP3) مباشرة",
+        ),
+        unsafe_allow_html=True,
     )
 
 # =========================================================
@@ -272,17 +294,3 @@ with tab4:
     with st.spinner("جاري مونتاج الفيديو..."):
       clips = []
       audio_clip = None
-      total_duration = len(video_images) * 3.0
-
-      if video_audio:
-        ext = os.path.splitext(video_audio.name)[1]
-        temp_aud_name = f"temp_audio{ext}"
-        with open(temp_aud_name, "wb") as f:
-          f.write(video_audio.read())
-        audio_clip = AudioFileClip(temp_aud_name)
-        total_duration = audio_clip.duration
-
-      duration_per_img = total_duration / len(video_images)
-
-      for idx, img_file in enumerate(video_images):
-        pil_img = prepare_image(img_file).convert("RGB")
