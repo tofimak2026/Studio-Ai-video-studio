@@ -1,4 +1,3 @@
-
 import asyncio
 import io
 import os
@@ -6,18 +5,43 @@ import urllib.parse
 import edge_tts
 from moviepy.editor import AudioFileClip, ImageClip, concatenate_videoclips
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageOps
 from rembg import remove
 import requests
 import streamlit as st
 
 st.set_page_config(page_title="Ago Italy AI Studio", page_icon="🚀", layout="wide")
 
+# --- نظام الحماية بكلمة مرور خاصة (نفس كلمتك السابقة) ---
+if "authenticated" not in st.session_state:
+  st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+  st.title("🔒 استوديو خاص - Ago Italy")
+  st.write("الرجاء إدخال كلمة السر للدخول:")
+  password_input = st.text_input("كلمة المرور:", type="password")
+
+  if st.button("دخول", type="primary"):
+    if (
+        "APP_PASSWORD" in st.secrets
+        and password_input == st.secrets["APP_PASSWORD"]
+    ):
+      st.session_state.authenticated = True
+      st.rerun()
+    else:
+      st.error("❌ كلمة المرور غير صحيحة!")
+  st.stop()
+# --------------------------------------
+
 st.title("🚀 استوديو الذكاء الاصطناعي المتكامل - Ago Italy")
-st.markdown(
-    "تجهيز صور المنتجات، الديكورات الفاخرة، التعليق الصوتي، وصناعة"
-    " الفيديوهات الإعلانية."
-)
+
+
+def prepare_image(uploaded_file, max_dim=1200):
+  img = Image.open(uploaded_file)
+  img = ImageOps.exif_transpose(img)
+  img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+  return img
+
 
 tab1, tab2, tab3, tab4 = st.tabs([
     "📸 1. مسح الخلفية",
@@ -26,80 +50,98 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "🎬 4. صانع الفيديو الإعلاني",
 ])
 
+# =========================================================
+# القسم 1: مسح الخلفية (مع حفظ النتيجة للتحميل المستقر)
+# =========================================================
 with tab1:
-  st.header("تجهيز صور المنتجات لمتجر Shopify (خلفية بيضاء)")
+  st.header("تجهيز صور المنتجات (خلفية بيضاء)")
   uploaded_files = st.file_uploader(
-      "ارفع صور أي منتج هنا (يمكنك رفع عدة صور دفعة واحدة):",
+      "اختر صور المنتجات:",
       type=["png", "jpg", "jpeg", "webp"],
       accept_multiple_files=True,
       key="tab1_uploader",
   )
 
   if uploaded_files and st.button("✨ مسح الخلفية الآن"):
-    cols = st.columns(2)
+    results = []
     for idx, file in enumerate(uploaded_files):
       with st.spinner(f"جاري معالجة {file.name}..."):
-        cutout_bytes = remove(file.read())
+        resized_pil = prepare_image(file)
+        img_byte_arr = io.BytesIO()
+        resized_pil.save(img_byte_arr, format="PNG")
+
+        cutout_bytes = remove(img_byte_arr.getvalue())
         img = Image.open(io.BytesIO(cutout_bytes)).convert("RGBA")
         white_bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
         final_img = Image.alpha_composite(white_bg, img).convert("RGB")
 
         buf = io.BytesIO()
         final_img.save(buf, format="JPEG", quality=95)
+        results.append({
+            "name": f"clean_{os.path.splitext(file.name)[0]}.jpg",
+            "bytes": buf.getvalue(),
+        })
+    st.session_state.clean_images = results
 
-        with cols[idx % 2]:
-          st.image(final_img, caption=file.name, use_container_width=True)
-          st.download_button(
-              label=f"⬇️ تحميل الصورة ({file.name})",
-              data=buf.getvalue(),
-              file_name=f"clean_{os.path.splitext(file.name)[0]}.jpg",
-              mime="image/jpeg",
-              key=f"dl_clean_{idx}",
-          )
+  if "clean_images" in st.session_state and st.session_state.clean_images:
+    cols = st.columns(2)
+    for idx, item in enumerate(st.session_state.clean_images):
+      with cols[idx % 2]:
+        st.image(item["bytes"], caption=item["name"], use_container_width=True)
+        st.download_button(
+            label="⬇️ اضغط هنا لحفظ الصورة",
+            data=item["bytes"],
+            file_name=item["name"],
+            mime="image/jpeg",
+            key=f"dl_clean_btn_{idx}",
+        )
 
+# =========================================================
+# القسم 2: ديكور فاخر للمنتج
+# =========================================================
 with tab2:
-  st.header("دمج منتجك الحقيقي في خلفية فاخرة بالذكاء الاصطناعي")
+  st.header("دمج منتجك الحقيقي في خلفية فاخرة")
   product_file = st.file_uploader(
-      "ارفع صورة المنتج الواضحة:",
+      "اختر صورة المنتج الواضحة:",
       type=["png", "jpg", "jpeg", "webp"],
       key="tab2_uploader",
   )
 
   scene_presets = {
-      "طاولة رخامية فاخرة مع إضاءة شمس ناعمة": (
+      "طاولة رخامية فاخرة": (
           "luxury white marble table, soft warm sunlight shadows, minimalist"
-          " aesthetic background, high resolution product photography"
+          " aesthetic background"
       ),
-      "طاولة خشبية دافئة في غرفة معيشة عصرية": (
+      "طاولة خشبية في غرفة معيشة": (
           "warm oak wooden table in a modern cozy Italian living room, soft"
-          " blurred background, natural daylight"
+          " blurred background"
       ),
       "مقهى إيطالي أنيق في ميلانو": (
           "chic outdoor cafe table in Milan Italy, blurred background, golden"
-          " hour sunlight, editorial fashion photography"
+          " hour sunlight"
       ),
-      "منصة عرض استوديو احترافية (Podium)": (
+      "منصة عرض استوديو (Podium)": (
           "minimalist beige stone podium studio background, soft dramatic"
-          " lighting, commercial photography"
+          " lighting"
       ),
-      "وصف مخصص (اكتب المكان الذي تريده بالأسفل)": "custom",
+      "وصف مخصص (اكتب بالأسفل)": "custom",
   }
 
-  selected_scene = st.selectbox(
-      "اختر المكان المناسب لمنتجك:", list(scene_presets.keys())
-  )
+  selected_scene = st.selectbox("اختر المكان:", list(scene_presets.keys()))
   if scene_presets[selected_scene] == "custom":
     scene_prompt = st.text_input(
-        "اكتب وصف الخلفية بالإنجليزية (مثال: luxury wooden table near a"
-        " window):",
-        "luxury marble table with soft lighting",
+        "اكتب وصف الخلفية بالإنجليزية:", "luxury marble table with soft lighting"
     )
   else:
     scene_prompt = scene_presets[selected_scene]
 
   if product_file and st.button("🎨 توليد المشهد ودمج المنتج"):
-    with st.spinner("جاري قص المنتج وتوليد الخلفية الفاخرة..."):
-      cutout_bytes = remove(product_file.read())
+    with st.spinner("جاري قص المنتج وتوليد الخلفية..."):
+      resized_pil = prepare_image(product_file)
+      img_byte_arr = io.BytesIO()
+      resized_pil.save(img_byte_arr, format="PNG")
+
+      cutout_bytes = remove(img_byte_arr.getvalue())
       prod_img = Image.open(io.BytesIO(cutout_bytes)).convert("RGBA")
 
       bbox = prod_img.getbbox()
@@ -116,55 +158,55 @@ with tab2:
             .convert("RGBA")
             .resize((1024, 1024))
         )
-
-        max_size = 620
-        prod_img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+        prod_img.thumbnail((620, 620), Image.Resampling.LANCZOS)
 
         pos_x = (1024 - prod_img.width) // 2
         pos_y = (1024 - prod_img.height) // 2 + 40
 
         shadow = Image.new("RGBA", prod_img.size, (0, 0, 0, 90))
-        shadow_mask = prod_img.split()[3]
-        shadow.putalpha(shadow_mask)
+        shadow.putalpha(prod_img.split()[3])
         shadow = shadow.filter(ImageFilter.GaussianBlur(15))
 
         bg_img.paste(shadow, (pos_x + 10, pos_y + 20), shadow)
         bg_img.paste(prod_img, (pos_x, pos_y), prod_img)
 
         final_scene = bg_img.convert("RGB")
-        st.image(
-            final_scene,
-            caption="النتيجة النهائية جاهزة للإعلان!",
-            use_container_width=True,
-        )
-
         buf = io.BytesIO()
         final_scene.save(buf, format="JPEG", quality=95)
-        st.download_button(
-            label="⬇️ تحميل الصورة الاحترافية",
-            data=buf.getvalue(),
-            file_name="ago_italy_luxury_scene.jpg",
-            mime="image/jpeg",
-        )
+        st.session_state.luxury_scene = buf.getvalue()
       else:
-        st.error("حدث ضغط على خادم توليد الخلفيات، يرجى المحاولة مرة أخرى.")
+        st.error("يرجى المحاولة مرة أخرى.")
 
+  if "luxury_scene" in st.session_state:
+    st.image(
+        st.session_state.luxury_scene,
+        caption="النتيجة النهائية",
+        use_container_width=True,
+    )
+    st.download_button(
+        label="⬇️ اضغط هنا لحفظ الصورة الاحترافية",
+        data=st.session_state.luxury_scene,
+        file_name="ago_italy_scene.jpg",
+        mime="image/jpeg",
+        key="dl_scene_btn",
+    )
+
+# =========================================================
+# القسم 3: التعليق الصوتي (مع حفظ الملف الصوتي للتحميل)
+# =========================================================
 with tab3:
-  st.header("توليد التعليق الصوتي الفوري للإعلانات (بدون انتظار)")
-
+  st.header("توليد التعليق الصوتي الفوري")
   voices = {
-      "🇮🇹 إيطالي - أنثى أنيقة (Elsa - للموضة والحقائب)": "it-IT-ElsaNeural",
-      "🇮🇹 إيطالي - أنثى حيوية (Isabella - للمنتجات المنزلية)": (
-          "it-IT-IsabellaNeural"
-      ),
-      "🇮🇹 إيطالي - رجل فخم (Diego)": "it-IT-DiegoNeural",
-      "🇸🇦 عربي خليجي/سعودي - أنثى (Zariyah)": "ar-SA-ZariyahNeural",
-      "🇸🇦 عربي خليجي/سعودي - رجل (Hamed)": "ar-SA-HamedNeural",
+      "🇮🇹 إيطالي - أنثى (Elsa)": "it-IT-ElsaNeural",
+      "🇮🇹 إيطالي - أنثى (Isabella)": "it-IT-IsabellaNeural",
+      "🇮🇹 إيطالي - رجل (Diego)": "it-IT-DiegoNeural",
+      "🇸🇦 عربي خليجي - أنثى (Zariyah)": "ar-SA-ZariyahNeural",
+      "🇸🇦 عربي خليجي - رجل (Hamed)": "ar-SA-HamedNeural",
       "🇦🇪 عربي إماراتي - أنثى (Fatima)": "ar-AE-FatimaNeural",
       "🇪🇬 عربي عام - أنثى (Salma)": "ar-EG-SalmaNeural",
-      "🇬🇧 إنجليزي بريطاني - أنثى (Sonia - لأوروبا)": "en-GB-SoniaNeural",
-      "🇺🇸 إنجليزي أمريكي - أنثى (Jenny)": "en-US-JennyNeural",
-      "🇺🇸 إنجليزي أمريكي - رجل (Christopher)": "en-US-ChristopherNeural",
+      "🇬🇧 إنجليزي - أنثى (Sonia)": "en-GB-SoniaNeural",
+      "🇺🇸 إنجليزي - أنثى (Jenny)": "en-US-JennyNeural",
+      "🇺🇸 إنجليزي - رجل (Christopher)": "en-US-ChristopherNeural",
   }
 
   selected_voice_label = st.selectbox(
@@ -173,10 +215,10 @@ with tab3:
   selected_voice = voices[selected_voice_label]
 
   script_text = st.text_area(
-      "اكتب نص الإعلان هنا بنفس لغة الصوت الذي اخترته:",
+      "اكتب نص الإعلان:",
       value=(
-          "Scopri la nuova collezione Ago Italy! Qualità garantita, spedizione"
-          " veloce e pagamento alla consegna."
+          "Scopri la nuova collezione Ago Italy! Spedizione veloce e pagamento"
+          " alla consegna."
       ),
       height=120,
       key="tts_script",
@@ -192,44 +234,42 @@ with tab3:
         audio_filename = "generated_voice.mp3"
         asyncio.run(create_tts(script_text, selected_voice, audio_filename))
         with open(audio_filename, "rb") as f:
-          audio_bytes = f.read()
-        st.audio(audio_bytes, format="audio/mp3")
-        st.download_button(
-            label="⬇️ تحميل الملف الصوتي (MP3)",
-            data=audio_bytes,
-            file_name="ago_italy_audio.mp3",
-            mime="audio/mpeg",
-        )
+          st.session_state.generated_audio = f.read()
     else:
       st.warning("يرجى كتابة النص أولاً.")
 
-with tab4:
-  st.header("صناعة فيديو إعلاني جاهز لفيسبوك وتيك توك")
-  st.markdown("ارفع من صورتين إلى 5 صور لمنتجك، وسيقوم التطبيق بتحريكها وتركيب الصوت عليها تلقائياً.")
+  if "generated_audio" in st.session_state:
+    st.audio(st.session_state.generated_audio, format="audio/mp3")
+    st.download_button(
+        label="⬇️ اضغط هنا لحفظ الملف الصوتي (MP3)",
+        data=st.session_state.generated_audio,
+        file_name="ago_italy_audio.mp3",
+        mime="audio/mpeg",
+        key="dl_audio_btn",
+    )
 
+# =========================================================
+# القسم 4: صانع الفيديو الإعلاني
+# =========================================================
+with tab4:
+  st.header("صناعة فيديو إعلاني جاهز")
   video_images = st.file_uploader(
-      "ارفع صور المنتج بالترتيب:",
+      "اختر صور المنتج:",
       type=["png", "jpg", "jpeg"],
       accept_multiple_files=True,
       key="tab4_uploader",
   )
   video_audio = st.file_uploader(
-      "ارفع ملف الصوت (MP3 أو WAV) الذي ولدته في القسم السابق (اختياري):",
-      type=["mp3", "wav"],
-      key="tab4_audio",
+      "ارفع ملف الصوت (اختياري):", type=["mp3", "wav"], key="tab4_audio"
   )
 
   aspect_ratio = st.radio(
-      "اختر مقاس الفيديو:",
-      [
-          "📱 عمودي 9:16 (TikTok / Reels / Facebook Ads)",
-          "💻 عرضي 16:9 (YouTube / الموقع)",
-      ],
+      "اختر مقاس الفيديو:", ["📱 عمودي 9:16 (TikTok / Reels)", "💻 عرضي 16:9"]
   )
   target_size = (720, 1280) if "9:16" in aspect_ratio else (1280, 720)
 
   if video_images and st.button("🎬 صناعة الفيديو الإعلاني الآن"):
-    with st.spinner("جاري مونتاج الفيديو وإضافة الحركة والصوت..."):
+    with st.spinner("جاري مونتاج الفيديو..."):
       clips = []
       audio_clip = None
       total_duration = len(video_images) * 3.0
@@ -245,45 +285,4 @@ with tab4:
       duration_per_img = total_duration / len(video_images)
 
       for idx, img_file in enumerate(video_images):
-        pil_img = Image.open(img_file).convert("RGB")
-        bg = pil_img.resize(target_size).filter(ImageFilter.GaussianBlur(30))
-        pil_img.thumbnail(
-            (target_size[0], int(target_size[1] * 0.8)),
-            Image.Resampling.LANCZOS,
-        )
-        paste_x = (target_size[0] - pil_img.width) // 2
-        paste_y = (target_size[1] - pil_img.height) // 2
-        bg.paste(pil_img, (paste_x, paste_y))
-
-        temp_img_path = f"frame_{idx}.jpg"
-        bg.save(temp_img_path, quality=90)
-
-        clip = (
-            ImageClip(temp_img_path)
-            .set_duration(duration_per_img)
-            .resize(lambda t: 1 + 0.04 * t)
-        )
-        clips.append(clip)
-
-      final_video = concatenate_videoclips(clips, method="compose")
-      if audio_clip:
-        final_video = final_video.set_audio(audio_clip)
-
-      output_video_path = "ago_italy_ad.mp4"
-      final_video.write_videofile(
-          output_video_path,
-          fps=24,
-          codec="libx264",
-          audio_codec="aac",
-          verbose=False,
-          logger=None,
-      )
-
-      with open(output_video_path, "rb") as v_file:
-        video_bytes = v_file.read()
-        st.video(video_bytes)
-        st.download_button(
-            label="⬇️ تحميل الفيديو الإعلاني الجاهز (MP4)",
-            data=video_bytes,
-            file_name="ago_italy_ad.mp4",
-          )
+        pil_img = prepare_image(img_file).convert("RGB")
