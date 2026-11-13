@@ -7,7 +7,6 @@ import edge_tts
 from moviepy.editor import AudioFileClip, ImageClip, concatenate_videoclips
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
-from rembg import remove
 import requests
 import streamlit as st
 
@@ -23,13 +22,8 @@ if not st.session_state.authenticated:
   password_input = st.text_input("كلمة المرور:", type="password")
 
   if st.button("دخول", type="primary"):
-    if (
-        "APP_PASSWORD" in st.secrets
-        and password_input == st.secrets["APP_PASSWORD"]
-    ):
-      st.session_state.authenticated = True
-      st.rerun()
-    elif password_input == "ago2026":
+    secret_pass = st.secrets.get("APP_PASSWORD", "ago2026")
+    if password_input == secret_pass or password_input == "ago2026":
       st.session_state.authenticated = True
       st.rerun()
     else:
@@ -49,27 +43,26 @@ def prepare_image(uploaded_file, max_dim=1200):
 
 def get_direct_download_link(file_bytes, filename, mime_type, button_text):
   b64 = base64.b64encode(file_bytes).decode()
-  href = (
+  return (
       f'<a href="data:{mime_type};base64,{b64}" download="{filename}"'
       ' style="display:inline-block; padding:10px 20px; background-color:#28a745;'
       " color:white; text-decoration:none; border-radius:6px; font-weight:bold;"
       f' margin-top:5px;">{button_text}</a>'
   )
-  return href
 
 
 tab1, tab2, tab3, tab4 = st.tabs([
-    "📸 1. مسح الخلفية",
-    "✨ 2. ديكور فاخر للمنتج",
+    "📸 1. تجهيز صور المتجر",
+    "✨ 2. توليد خلفيات فاخرة",
     "🎙️ 3. تعليق صوتي سريع",
     "🎬 4. صانع الفيديو الإعلاني",
 ])
 
 # =========================================================
-# القسم 1: مسح الخلفية
+# القسم 1: تجهيز وتعديل مقاسات وإضاءة صور المنتجات لـ Shopify
 # =========================================================
 with tab1:
-  st.header("تجهيز صور المنتجات (خلفية بيضاء)")
+  st.header("تحسين جودة ومقاسات صور المنتجات لمتجر Shopify")
   uploaded_files = st.file_uploader(
       "اختر صور المنتجات:",
       type=["png", "jpg", "jpeg", "webp"],
@@ -77,26 +70,22 @@ with tab1:
       key="tab1_uploader",
   )
 
-  if uploaded_files and st.button("✨ مسح الخلفية الآن"):
+  if uploaded_files and st.button("✨ تجهيز الصور الآن"):
     results = []
     for idx, file in enumerate(uploaded_files):
-      with st.spinner(f"جاري معالجة {file.name}..."):
-        resized_pil = prepare_image(file)
-        img_byte_arr = io.BytesIO()
-        resized_pil.save(img_byte_arr, format="PNG")
+      img = prepare_image(file, max_dim=1200).convert("RGB")
+      # وضع الصورة داخل إطار مربع مثالي لمتاجر Shopify
+      square_bg = Image.new("RGB", (1200, 1200), (255, 255, 255))
+      paste_x = (1200 - img.width) // 2
+      paste_y = (1200 - img.height) // 2
+      square_bg.paste(img, (paste_x, paste_y))
 
-        cutout_bytes = remove(img_byte_arr.getvalue())
-        img = Image.open(io.BytesIO(cutout_bytes)).convert("RGBA")
-        white_bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
-        final_img = Image.alpha_composite(white_bg, img).convert("RGB")
-
-        buf = io.BytesIO()
-        final_img.save(buf, format="JPEG", quality=95)
-        base_name = os.path.splitext(file.name)[0]
-        results.append({
-            "name": f"clean_{base_name}.jpg",
-            "bytes": buf.getvalue(),
-        })
+      buf = io.BytesIO()
+      square_bg.save(buf, format="JPEG", quality=95)
+      base_name = os.path.splitext(file.name)
+      results.append(
+          {"name": f"shopify_{base_name}.jpg", "bytes": buf.getvalue()}
+      )
     st.session_state.clean_images = results
 
   if "clean_images" in st.session_state and st.session_state.clean_images:
@@ -109,113 +98,80 @@ with tab1:
                 item["bytes"],
                 item["name"],
                 "image/jpeg",
-                "⬇️ تحميل الصورة مباشرة",
+                "⬇️ تحميل الصورة لـ Shopify",
             ),
             unsafe_allow_html=True,
         )
 
 # =========================================================
-# القسم 2: ديكور فاخر للمنتج
+# القسم 2: توليد خلفيات وصور إعلانية بالذكاء الاصطناعي
 # =========================================================
 with tab2:
-  st.header("دمج منتجك الحقيقي في خلفية فاخرة")
-  product_file = st.file_uploader(
-      "اختر صورة المنتج الواضحة:",
-      type=["png", "jpg", "jpeg", "webp"],
-      key="tab2_uploader",
-  )
+  st.header("توليد صور ديكور فاخرة للمنتجات بالذكاء الاصطناعي")
 
   scene_presets = {
-      "طاولة رخامية فاخرة": (
+      "طاولة رخامية فاخرة مع إضاءة شمس": (
           "luxury white marble table, soft warm sunlight shadows, minimalist"
-          " aesthetic background"
+          " aesthetic product photography background"
       ),
-      "طاولة خشبية في غرفة معيشة": (
+      "طاولة خشبية في غرفة معيشة إيطالية": (
           "warm oak wooden table in a modern cozy Italian living room, soft"
-          " blurred background"
+          " blurred background, natural daylight"
       ),
       "مقهى إيطالي أنيق في ميلانو": (
           "chic outdoor cafe table in Milan Italy, blurred background, golden"
-          " hour sunlight"
+          " hour sunlight, luxury editorial photography"
       ),
-      "منصة عرض استوديو (Podium)": (
+      "منصة عرض استوديو احترافية": (
           "minimalist beige stone podium studio background, soft dramatic"
-          " lighting"
+          " lighting, commercial photography"
       ),
       "وصف مخصص (اكتب بالأسفل)": "custom",
   }
 
-  selected_scene = st.selectbox("اختر المكان:", list(scene_presets.keys()))
+  selected_scene = st.selectbox(
+      "اختر نوع الخلفية أو الصورة:", list(scene_presets.keys())
+  )
   if scene_presets[selected_scene] == "custom":
     scene_prompt = st.text_input(
-        "اكتب وصف الخلفية بالإنجليزية:", "luxury marble table with soft lighting"
+        "اكتب وصف الصورة المطلوبة بالإنجليزية:",
+        "luxury leather handbag on a marble table in Milan, high quality",
     )
   else:
     scene_prompt = scene_presets[selected_scene]
 
-  if product_file and st.button("🎨 توليد المشهد ودمج المنتج"):
-    with st.spinner("جاري قص المنتج وتوليد الخلفية..."):
-      resized_pil = prepare_image(product_file)
-      img_byte_arr = io.BytesIO()
-      resized_pil.save(img_byte_arr, format="PNG")
-
-      cutout_bytes = remove(img_byte_arr.getvalue())
-      prod_img = Image.open(io.BytesIO(cutout_bytes)).convert("RGBA")
-
-      bbox = prod_img.getbbox()
-      if bbox:
-        prod_img = prod_img.crop(bbox)
-
+  if st.button("🎨 توليد الصورة الآن"):
+    with st.spinner("جاري رسم الصورة بالذكاء الاصطناعي..."):
       encoded_prompt = urllib.parse.quote(scene_prompt)
       bg_url = f"https://pollinations.ai{encoded_prompt}?width=1024&height=1024&nologo=true"
       response = requests.get(bg_url, timeout=30)
 
       if response.status_code == 200:
-        bg_img = (
-            Image.open(io.BytesIO(response.content))
-            .convert("RGBA")
-            .resize((1024, 1024))
-        )
-        prod_img.thumbnail((620, 620), Image.Resampling.LANCZOS)
-
-        pos_x = (1024 - prod_img.width) // 2
-        pos_y = (1024 - prod_img.height) // 2 + 40
-
-        shadow = Image.new("RGBA", prod_img.size, (0, 0, 0, 90))
-        shadow.putalpha(prod_img.split()[3])
-        shadow = shadow.filter(ImageFilter.GaussianBlur(15))
-
-        bg_img.paste(shadow, (pos_x + 10, pos_y + 20), shadow)
-        bg_img.paste(prod_img, (pos_x, pos_y), prod_img)
-
-        final_scene = bg_img.convert("RGB")
-        buf = io.BytesIO()
-        final_scene.save(buf, format="JPEG", quality=95)
-        st.session_state.luxury_scene = buf.getvalue()
+        st.session_state.luxury_scene = response.content
       else:
         st.error("يرجى المحاولة مرة أخرى.")
 
   if "luxury_scene" in st.session_state:
     st.image(
         st.session_state.luxury_scene,
-        caption="النتيجة النهائية",
+        caption="الصورة المولدة",
         use_container_width=True,
     )
     st.markdown(
         get_direct_download_link(
             st.session_state.luxury_scene,
-            "ago_italy_scene.jpg",
+            "ago_italy_ai_photo.jpg",
             "image/jpeg",
-            "⬇️ تحميل الصورة الاحترافية مباشرة",
+            "⬇️ تحميل الصورة مباشرة",
         ),
         unsafe_allow_html=True,
     )
 
 # =========================================================
-# القسم 3: التعليق الصوتي السريع
+# القسم 3: التعليق الصوتي السريع (إيطالي، عربي، إنجليزي)
 # =========================================================
 with tab3:
-  st.header("توليد التعليق الصوتي الفوري")
+  st.header("توليد التعليق الصوتي الفوري للإعلانات")
   voices = {
       "🇮🇹 إيطالي - أنثى (Elsa)": "it-IT-ElsaNeural",
       "🇮🇹 إيطالي - أنثى (Isabella)": "it-IT-IsabellaNeural",
@@ -265,7 +221,7 @@ with tab3:
             st.session_state.generated_audio,
             "ago_italy_audio.mp3",
             "audio/mpeg",
-            "⬇️ تحميل الملف الصوتي (MP3) مباشرة",
+            "⬇️ تحميل الملف الصوتي (MP3)",
         ),
         unsafe_allow_html=True,
     )
@@ -274,7 +230,7 @@ with tab3:
 # القسم 4: صانع الفيديو الإعلاني
 # =========================================================
 with tab4:
-  st.header("صناعة فيديو إعلاني جاهز")
+  st.header("صناعة فيديو إعلاني جاهز لفيسبوك وتيك توك")
   video_images = st.file_uploader(
       "اختر صور المنتج:",
       type=["png", "jpg", "jpeg"],
@@ -294,3 +250,38 @@ with tab4:
     with st.spinner("جاري مونتاج الفيديو..."):
       clips = []
       audio_clip = None
+      total_duration = len(video_images) * 3.0
+
+      if video_audio:
+        ext = os.path.splitext(video_audio.name)
+        temp_aud_name = f"temp_audio{ext}"
+        with open(temp_aud_name, "wb") as f:
+          f.write(video_audio.read())
+        audio_clip = AudioFileClip(temp_aud_name)
+        total_duration = audio_clip.duration
+
+      duration_per_img = total_duration / len(video_images)
+
+      for idx, img_file in enumerate(video_images):
+        pil_img = prepare_image(img_file).convert("RGB")
+        bg = pil_img.resize(target_size).filter(ImageFilter.GaussianBlur(30))
+        pil_img.thumbnail(
+            (target_size, int(target_size * 0.8)),
+            Image.Resampling.LANCZOS,
+        )
+        paste_x = (target_size - pil_img.width) // 2
+        paste_y = (target_size - pil_img.height) // 2
+        bg.paste(pil_img, (paste_x, paste_y))
+
+        temp_img_path = f"frame_{idx}.jpg"
+        bg.save(temp_img_path, quality=90)
+
+        clip = (
+            ImageClip(temp_img_path)
+            .set_duration(duration_per_img)
+            .resize(lambda t: 1 + 0.04 * t)
+        )
+        clips.append(clip)
+
+      final_video = concatenate_videoclips(clips, method="compose")
+      if audio_clip:
