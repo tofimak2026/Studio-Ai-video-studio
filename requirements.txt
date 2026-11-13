@@ -1,8 +1,6 @@
 streamlit
-rembg
 pillow
 edge-tts
-onnxruntime
 requests
 moviepy==1.0.3
 numpy
