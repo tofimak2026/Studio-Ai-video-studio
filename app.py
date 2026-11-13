@@ -296,7 +296,7 @@ with tab4:
 
       final_video = concatenate_videoclips(clips, method="compose")
       
-     if audio_clip:
+    if audio_clip:
       final_video = final_video.set_audio(audio_clip)
 
       output_video_path = "ago_italy_ad.mp4"
