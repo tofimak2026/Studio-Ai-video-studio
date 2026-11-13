@@ -1,5 +1,4 @@
 import asyncio
-import base64
 import io
 import os
 import urllib.parse
@@ -40,10 +39,6 @@ def prepare_image(uploaded_file, max_dim=1200):
     img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
     return img
 
-def get_direct_download_link(file_bytes, filename, mime_type, button_text):
-    b64 = base64.b64encode(file_bytes).decode()
-    return f'<a href="data:{mime_type};base64,{b64}" download="{filename}" style="display:inline-block; padding:10px 20px; background-color:#28a745; color:white; text-decoration:none; border-radius:6px; font-weight:bold; margin-top:5px;">{button_text}</a>'
-
 async def create_tts(text, voice, out_path):
     communicate = edge_tts.Communicate(text, voice)
     await communicate.save(out_path)
@@ -75,21 +70,27 @@ with tab1:
                 final_sq = square_bg.convert("RGB")
                 buf = io.BytesIO()
                 final_sq.save(buf, format="JPEG", quality=95)
-                base_name = os.path.splitext(file.name)
-                results.append({"name": f"shopify_{base_name}.jpg", "bytes": buf.getvalue()})
+                clean_name = f"shopify_bag_{idx+1}.jpg"
+                results.append({"name": clean_name, "bytes": buf.getvalue()})
             st.session_state.clean_images = results
     if "clean_images" in st.session_state and st.session_state.clean_images:
         cols = st.columns(2)
         for idx, item in enumerate(st.session_state.clean_images):
             with cols[idx % 2]:
                 st.image(item["bytes"], caption=item["name"], use_container_width=True)
-                st.markdown(get_direct_download_link(item["bytes"], item["name"], "image/jpeg", "⬇️ تحميل الصورة لـ Shopify"), unsafe_allow_html=True)
+                st.download_button(
+                    label=f"⬇️ تحميل {item['name']}",
+                    data=item["bytes"],
+                    file_name=item["name"],
+                    mime="image/jpeg",
+                    key=f"dl_tab1_{idx}"
+                )
 
 with tab2:
     st.header("تفريغ الحقيبة تلقائياً ودمجها في ديكور فاخر")
     ref_product = st.file_uploader("ارفع صورة الحقيبة (سيتم قص الخلفية تلقائياً):", type=["png", "jpg", "jpeg", "webp"], key="tab2_uploader")
     scene_presets = {
-        "طاولة رخامية فاخرة مع إضاءة شمس": "luxury white marble table top surface, soft warm sunlight shadows, minimalist aesthetic product photography background, empty center",
+        "طاولة رخامية فاخرة مع إضاءة شمس": "luxury white marble table top surface, soft warm sunlight shadows, minimalist aesthetic product photography background",
         "طاولة خشبية في غرفة معيشة إيطالية": "warm oak wooden table top in a modern cozy Italian living room, soft blurred background, natural daylight",
         "مقهى إيطالي أنيق في ميلانو": "chic outdoor cafe table surface in Milan Italy, blurred background, golden hour sunlight, luxury editorial photography",
         "منصة عرض استوديو احترافية": "minimalist beige stone podium studio background, soft dramatic lighting, commercial photography",
@@ -103,26 +104,36 @@ with tab2:
     if st.button("🎨 توليد المشهد ودمج الحقيبة"):
         with st.spinner("جاري قص الحقيبة وتوليد الديكور بالذكاء الاصطناعي..."):
             encoded_prompt = urllib.parse.quote(scene_prompt)
-            bg_url = f"https://pollinations.ai{encoded_prompt}?width=1024&height=1024&nologo=true"
-            response = requests.get(bg_url, timeout=45)
-            if response.status_code == 200:
-                bg_img = Image.open(io.BytesIO(response.content)).convert("RGBA").resize((1024, 1024))
-                if ref_product:
-                    session = get_bg_session()
-                    prod_img = prepare_image(ref_product, max_dim=650).convert("RGBA")
-                    prod_no_bg = remove(prod_img, session=session)
-                    pos_x = (1024 - prod_no_bg.width) // 2
-                    pos_y = int((1024 - prod_no_bg.height) * 0.58)
-                    bg_img.paste(prod_no_bg, (pos_x, pos_y), prod_no_bg)
-                final_out = bg_img.convert("RGB")
-                buf = io.BytesIO()
-                final_out.save(buf, format="JPEG", quality=95)
-                st.session_state.luxury_scene = buf.getvalue()
-            else:
-                st.error("تعذر الاتصال بخادم الصور، يرجى المحاولة مرة أخرى.")
+            base_api = "https://pollinations.ai"
+            bg_url = f"{base_api}{encoded_prompt}?width=1024&height=1024&nologo=true"
+            try:
+                response = requests.get(bg_url, timeout=45)
+                if response.status_code == 200:
+                    bg_img = Image.open(io.BytesIO(response.content)).convert("RGBA").resize((1024, 1024))
+                    if ref_product:
+                        session = get_bg_session()
+                        prod_img = prepare_image(ref_product, max_dim=650).convert("RGBA")
+                        prod_no_bg = remove(prod_img, session=session)
+                        pos_x = (1024 - prod_no_bg.width) // 2
+                        pos_y = int((1024 - prod_no_bg.height) * 0.58)
+                        bg_img.paste(prod_no_bg, (pos_x, pos_y), prod_no_bg)
+                    final_out = bg_img.convert("RGB")
+                    buf = io.BytesIO()
+                    final_out.save(buf, format="JPEG", quality=95)
+                    st.session_state.luxury_scene = buf.getvalue()
+                else:
+                    st.error("خادم الصور مشغول حالياً، اضغط توليد مرة أخرى.")
+            except Exception as e:
+                st.error("حدث خطأ في الاتصال بخادم الصور، حاول مرة أخرى.")
     if "luxury_scene" in st.session_state:
         st.image(st.session_state.luxury_scene, caption="الصورة النهائية الجاهزة", use_container_width=True)
-        st.markdown(get_direct_download_link(st.session_state.luxury_scene, "ago_italy_luxury.jpg", "image/jpeg", "⬇️ تحميل الصورة مباشرة"), unsafe_allow_html=True)
+        st.download_button(
+            label="⬇️ تحميل الصورة الفاخرة",
+            data=st.session_state.luxury_scene,
+            file_name="ago_italy_luxury.jpg",
+            mime="image/jpeg",
+            key="dl_tab2"
+        )
 
 with tab3:
     st.header("توليد التعليق الصوتي الفوري للإعلانات والفيديوهات")
@@ -152,7 +163,13 @@ with tab3:
             st.warning("يرجى كتابة النص أولاً.")
     if "generated_audio" in st.session_state:
         st.audio(st.session_state.generated_audio, format="audio/mp3")
-        st.markdown(get_direct_download_link(st.session_state.generated_audio, "ago_italy_audio.mp3", "audio/mpeg", "⬇️ تحميل الملف الصوتي (MP3)"), unsafe_allow_html=True)
+        st.download_button(
+            label="⬇️ تحميل الملف الصوتي (MP3)",
+            data=st.session_state.generated_audio,
+            file_name="ago_italy_audio.mp3",
+            mime="audio/mpeg",
+            key="dl_tab3"
+        )
 
 with tab4:
     st.header("صناعة فيديو إعلاني جاهز لفيسبوك وتيك توك")
