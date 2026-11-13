@@ -283,7 +283,7 @@ with tab4:
         )
         clips.append(clip)
 
-            final_video = concatenate_videoclips(clips, method="compose")
+      final_video = concatenate_videoclips(clips, method="compose")
       if audio_clip:
         final_video = final_video.set_audio(audio_clip)
 
