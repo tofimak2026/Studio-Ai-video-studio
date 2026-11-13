@@ -87,44 +87,52 @@ with tab1:
                 )
 
 with tab2:
-    st.header("تفريغ الحقيبة تلقائياً ودمجها في ديكور فاخر")
+    st.header("تفريغ الحقيبة تلقائياً ودمجها في خلفية استوديو فاخرة")
     ref_product = st.file_uploader("ارفع صورة الحقيبة (سيتم قص الخلفية تلقائياً):", type=["png", "jpg", "jpeg", "webp"], key="tab2_uploader")
-    scene_presets = {
-        "طاولة رخامية فاخرة مع إضاءة شمس": "luxury white marble table top surface, soft warm sunlight shadows, minimalist aesthetic product photography background",
-        "طاولة خشبية في غرفة معيشة إيطالية": "warm oak wooden table top in a modern cozy Italian living room, soft blurred background, natural daylight",
-        "مقهى إيطالي أنيق في ميلانو": "chic outdoor cafe table surface in Milan Italy, blurred background, golden hour sunlight, luxury editorial photography",
-        "منصة عرض استوديو احترافية": "minimalist beige stone podium studio background, soft dramatic lighting, commercial photography",
-        "وصف مخصص (اكتب بالأسفل)": "custom",
+    
+    bg_styles = {
+        "بيج دافئ فاخر (Luxury Warm Beige)": ((245, 238, 228), (222, 208, 190)),
+        "رمادي رخامي عصري (Modern Studio Grey)": ((240, 242, 245), (205, 210, 218)),
+        "وردي باستيل ناعم (Soft Blush Pink)": ((252, 238, 240), (235, 205, 212)),
+        "ذهبي فاتح ملكي (Champagne Gold)": ((250, 244, 230), (230, 215, 185)),
+        "أسود استوديو فاخر (Dark Luxury)": ((55, 55, 60), (20, 20, 24)),
     }
-    selected_scene = st.selectbox("اختر نوع الخلفية أو الديكور:", list(scene_presets.keys()))
-    if scene_presets[selected_scene] == "custom":
-        scene_prompt = st.text_input("اكتب وصف الخلفية بالإنجليزية:", "luxury marble pedestal with soft warm lighting, product display")
-    else:
-        scene_prompt = scene_presets[selected_scene]
-    if st.button("🎨 توليد المشهد ودمج الحقيبة"):
-        with st.spinner("جاري قص الحقيبة وتوليد الديكور بالذكاء الاصطناعي..."):
-            encoded_prompt = urllib.parse.quote(scene_prompt)
-            base_api = "https://pollinations.ai"
-            bg_url = f"{base_api}{encoded_prompt}?width=1024&height=1024&nologo=true"
-            try:
-                response = requests.get(bg_url, timeout=45)
-                if response.status_code == 200:
-                    bg_img = Image.open(io.BytesIO(response.content)).convert("RGBA").resize((1024, 1024))
-                    if ref_product:
-                        session = get_bg_session()
-                        prod_img = prepare_image(ref_product, max_dim=650).convert("RGBA")
-                        prod_no_bg = remove(prod_img, session=session)
-                        pos_x = (1024 - prod_no_bg.width) // 2
-                        pos_y = int((1024 - prod_no_bg.height) * 0.58)
-                        bg_img.paste(prod_no_bg, (pos_x, pos_y), prod_no_bg)
-                    final_out = bg_img.convert("RGB")
-                    buf = io.BytesIO()
-                    final_out.save(buf, format="JPEG", quality=95)
-                    st.session_state.luxury_scene = buf.getvalue()
-                else:
-                    st.error("خادم الصور مشغول حالياً، اضغط توليد مرة أخرى.")
-            except Exception as e:
-                st.error("حدث خطأ في الاتصال بخادم الصور، حاول مرة أخرى.")
+    selected_style = st.selectbox("اختر لون وإضاءة الاستوديو:", list(bg_styles.keys()))
+
+    if ref_product and st.button("🎨 توليد المشهد ودمج الحقيبة"):
+        with st.spinner("جاري قص الحقيبة وإضافة الإضاءة والظل..."):
+            session = get_bg_session()
+            prod_img = prepare_image(ref_product, max_dim=680).convert("RGBA")
+            prod_no_bg = remove(prod_img, session=session)
+
+            # إنشاء خلفية استوديو متدرجة الإضاءة محلياً
+            top_c, bot_c = bg_styles[selected_style]
+            bg_img = Image.new("RGBA", (1024, 1024))
+            for y in range(1024):
+                ratio = y / 1024
+                r = int(top_c[0] * (1 - ratio) + bot_c[0] * ratio)
+                g = int(top_c[1] * (1 - ratio) + bot_c[1] * ratio)
+                b = int(top_c[2] * (1 - ratio) + bot_c[2] * ratio)
+                for x in range(1024):
+                    bg_img.putpixel((x, y), (r, g, b, 255))
+
+            # إضافة ظل ناعم أسفل الحقيبة لزيادة الواقعية
+            shadow = Image.new("RGBA", (prod_no_bg.width, 60), (0, 0, 0, 0))
+            from PIL import ImageDraw
+            draw = ImageDraw.Draw(shadow)
+            draw.ellipse([20, 10, prod_no_bg.width - 20, 50], fill=(0, 0, 0, 75))
+            shadow = shadow.filter(ImageFilter.GaussianBlur(15))
+
+            pos_x = (1024 - prod_no_bg.width) // 2
+            pos_y = (1024 - prod_no_bg.height) // 2
+            bg_img.paste(shadow, (pos_x, pos_y + prod_no_bg.height - 30), shadow)
+            bg_img.paste(prod_no_bg, (pos_x, pos_y), prod_no_bg)
+
+            final_out = bg_img.convert("RGB")
+            buf = io.BytesIO()
+            final_out.save(buf, format="JPEG", quality=95)
+            st.session_state.luxury_scene = buf.getvalue()
+
     if "luxury_scene" in st.session_state:
         st.image(st.session_state.luxury_scene, caption="الصورة النهائية الجاهزة", use_container_width=True)
         st.download_button(
@@ -134,6 +142,7 @@ with tab2:
             mime="image/jpeg",
             key="dl_tab2"
         )
+
 
 with tab3:
     st.header("توليد التعليق الصوتي الفوري للإعلانات والفيديوهات")
