@@ -7,7 +7,7 @@ import edge_tts
 from moviepy.editor import AudioFileClip, ImageClip, VideoFileClip, concatenate_videoclips
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
-from rembg import remove
+from rembg import new_session, remove
 import requests
 import streamlit as st
 
@@ -29,6 +29,10 @@ if not st.session_state.authenticated:
     st.stop()
 
 st.title("🚀 استوديو الذكاء الاصطناعي المتكامل - Ago Italy")
+
+@st.cache_resource
+def get_bg_session():
+    return new_session("u2netp")
 
 def prepare_image(uploaded_file, max_dim=1200):
     img = Image.open(uploaded_file)
@@ -58,11 +62,12 @@ with tab1:
     remove_bg_tab1 = st.checkbox("إزالة الخلفية وتفريغ المنتج على خلفية بيضاء نقية", value=True)
     if uploaded_files and st.button("✨ تجهيز الصور الآن"):
         with st.spinner("جاري معالجة الصور وتفريغ الخلفية..."):
+            session = get_bg_session() if remove_bg_tab1 else None
             results = []
             for idx, file in enumerate(uploaded_files):
                 img = prepare_image(file, max_dim=1100).convert("RGBA")
                 if remove_bg_tab1:
-                    img = remove(img)
+                    img = remove(img, session=session)
                 square_bg = Image.new("RGBA", (1200, 1200), (255, 255, 255, 255))
                 paste_x = (1200 - img.width) // 2
                 paste_y = (1200 - img.height) // 2
@@ -103,8 +108,9 @@ with tab2:
             if response.status_code == 200:
                 bg_img = Image.open(io.BytesIO(response.content)).convert("RGBA").resize((1024, 1024))
                 if ref_product:
+                    session = get_bg_session()
                     prod_img = prepare_image(ref_product, max_dim=650).convert("RGBA")
-                    prod_no_bg = remove(prod_img)
+                    prod_no_bg = remove(prod_img, session=session)
                     pos_x = (1024 - prod_no_bg.width) // 2
                     pos_y = int((1024 - prod_no_bg.height) * 0.58)
                     bg_img.paste(prod_no_bg, (pos_x, pos_y), prod_no_bg)
@@ -174,8 +180,3 @@ with tab4:
                 new_w = int(target_w * 0.9)
                 new_h = int(target_h * 0.8)
                 pil_img.thumbnail((new_w, new_h))
-                paste_x = (target_w - pil_img.width) // 2
-                paste_y = (target_h - pil_img.height) // 2
-                bg.paste(pil_img, (paste_x, paste_y))
-                temp_img_path = f"frame_{idx}.jpg"
-                bg.save(temp_img_path, quality=90)
