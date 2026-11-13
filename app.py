@@ -285,3 +285,4 @@ with tab4:
 
       final_video = concatenate_videoclips(clips, method="compose")
       if audio_clip:
+        )
