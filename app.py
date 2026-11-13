@@ -12,15 +12,12 @@ import streamlit as st
 
 st.set_page_config(page_title="Ago Italy AI Studio", page_icon="🚀", layout="wide")
 
-# --- نظام الحماية بكلمة مرور خاصة ---
 if "authenticated" not in st.session_state:
   st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
   st.title("🔒 استوديو خاص - Ago Italy")
-  st.write("الرجاء إدخال كلمة السر للدخول:")
   password_input = st.text_input("كلمة المرور:", type="password")
-
   if st.button("دخول", type="primary"):
     secret_pass = st.secrets.get("APP_PASSWORD", "ago2026")
     if password_input == secret_pass or password_input == "ago2026":
@@ -29,7 +26,6 @@ if not st.session_state.authenticated:
     else:
       st.error("❌ كلمة المرور غير صحيحة!")
   st.stop()
-# --------------------------------------
 
 st.title("🚀 استوديو الذكاء الاصطناعي المتكامل - Ago Italy")
 
@@ -58,9 +54,6 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "🎬 4. صانع الفيديو الإعلاني",
 ])
 
-# =========================================================
-# القسم 1: تجهيز وتعديل مقاسات وإضاءة صور المنتجات لـ Shopify
-# =========================================================
 with tab1:
   st.header("تحسين جودة ومقاسات صور المنتجات لمتجر Shopify")
   uploaded_files = st.file_uploader(
@@ -69,17 +62,14 @@ with tab1:
       accept_multiple_files=True,
       key="tab1_uploader",
   )
-
   if uploaded_files and st.button("✨ تجهيز الصور الآن"):
     results = []
     for idx, file in enumerate(uploaded_files):
       img = prepare_image(file, max_dim=1200).convert("RGB")
-      # وضع الصورة داخل إطار مربع مثالي لمتاجر Shopify
       square_bg = Image.new("RGB", (1200, 1200), (255, 255, 255))
       paste_x = (1200 - img.width) // 2
       paste_y = (1200 - img.height) // 2
       square_bg.paste(img, (paste_x, paste_y))
-
       buf = io.BytesIO()
       square_bg.save(buf, format="JPEG", quality=95)
       base_name = os.path.splitext(file.name)
@@ -103,12 +93,8 @@ with tab1:
             unsafe_allow_html=True,
         )
 
-# =========================================================
-# القسم 2: توليد خلفيات وصور إعلانية بالذكاء الاصطناعي
-# =========================================================
 with tab2:
   st.header("توليد صور ديكور فاخرة للمنتجات بالذكاء الاصطناعي")
-
   scene_presets = {
       "طاولة رخامية فاخرة مع إضاءة شمس": (
           "luxury white marble table, soft warm sunlight shadows, minimalist"
@@ -128,7 +114,6 @@ with tab2:
       ),
       "وصف مخصص (اكتب بالأسفل)": "custom",
   }
-
   selected_scene = st.selectbox(
       "اختر نوع الخلفية أو الصورة:", list(scene_presets.keys())
   )
@@ -143,9 +128,9 @@ with tab2:
   if st.button("🎨 توليد الصورة الآن"):
     with st.spinner("جاري رسم الصورة بالذكاء الاصطناعي..."):
       encoded_prompt = urllib.parse.quote(scene_prompt)
-      bg_url = f"https://pollinations.ai{encoded_prompt}?width=1024&height=1024&nologo=true"
-      response = requests.get(bg_url, timeout=30)
-
+      host = "https://pollinations.ai"
+      path = f"/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
+      response = requests.get(host + path, timeout=30)
       if response.status_code == 200:
         st.session_state.luxury_scene = response.content
       else:
@@ -167,9 +152,6 @@ with tab2:
         unsafe_allow_html=True,
     )
 
-# =========================================================
-# القسم 3: التعليق الصوتي السريع (إيطالي، عربي، إنجليزي)
-# =========================================================
 with tab3:
   st.header("توليد التعليق الصوتي الفوري للإعلانات")
   voices = {
@@ -184,12 +166,10 @@ with tab3:
       "🇺🇸 إنجليزي - أنثى (Jenny)": "en-US-JennyNeural",
       "🇺🇸 إنجليزي - رجل (Christopher)": "en-US-ChristopherNeural",
   }
-
   selected_voice_label = st.selectbox(
       "اختر اللغة والصوت:", list(voices.keys())
   )
   selected_voice = voices[selected_voice_label]
-
   script_text = st.text_area(
       "اكتب نص الإعلان:",
       value=(
@@ -226,9 +206,6 @@ with tab3:
         unsafe_allow_html=True,
     )
 
-# =========================================================
-# القسم 4: صانع الفيديو الإعلاني
-# =========================================================
 with tab4:
   st.header("صناعة فيديو إعلاني جاهز لفيسبوك وتيك توك")
   video_images = st.file_uploader(
@@ -240,7 +217,6 @@ with tab4:
   video_audio = st.file_uploader(
       "ارفع ملف الصوت (اختياري):", type=["mp3", "wav"], key="tab4_audio"
   )
-
   aspect_ratio = st.radio(
       "اختر مقاس الفيديو:", ["📱 عمودي 9:16 (TikTok / Reels)", "💻 عرضي 16:9"]
   )
@@ -251,7 +227,6 @@ with tab4:
       clips = []
       audio_clip = None
       total_duration = len(video_images) * 3.0
-
       if video_audio:
         ext = os.path.splitext(video_audio.name)
         temp_aud_name = f"temp_audio{ext}"
@@ -259,9 +234,7 @@ with tab4:
           f.write(video_audio.read())
         audio_clip = AudioFileClip(temp_aud_name)
         total_duration = audio_clip.duration
-
       duration_per_img = total_duration / len(video_images)
-
       for idx, img_file in enumerate(video_images):
         pil_img = prepare_image(img_file).convert("RGB")
         bg = pil_img.resize(target_size).filter(ImageFilter.GaussianBlur(30))
@@ -272,21 +245,17 @@ with tab4:
         paste_x = (target_size - pil_img.width) // 2
         paste_y = (target_size - pil_img.height) // 2
         bg.paste(pil_img, (paste_x, paste_y))
-
         temp_img_path = f"frame_{idx}.jpg"
         bg.save(temp_img_path, quality=90)
-
         clip = (
             ImageClip(temp_img_path)
             .set_duration(duration_per_img)
             .resize(lambda t: 1 + 0.04 * t)
         )
         clips.append(clip)
-
       final_video = concatenate_videoclips(clips, method="compose")
       if audio_clip:
         final_video = final_video.set_audio(audio_clip)
-
       output_video_path = "ago_italy_ad.mp4"
       final_video.write_videofile(
           output_video_path,
@@ -296,7 +265,6 @@ with tab4:
           verbose=False,
           logger=None,
       )
-
       with open(output_video_path, "rb") as v_file:
         st.session_state.generated_video = v_file.read()
 
@@ -308,4 +276,3 @@ with tab4:
         file_name="ago_italy_ad.mp4",
         mime="video/mp4",
     )
-
