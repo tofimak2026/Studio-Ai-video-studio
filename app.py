@@ -142,7 +142,8 @@ with tab2:
   if st.button("🎨 توليد الصورة الآن"):
     with st.spinner("جاري رسم الصورة بالذكاء الاصطناعي..."):
       encoded_prompt = urllib.parse.quote(scene_prompt)
-      bg_url = f"https://pollinations.ai{encoded_prompt}?width=1024&height=1024&nologo=true"
+      domain = "https://pollinations.ai"
+      bg_url = f"{domain}{encoded_prompt}?width=1024&height=1024&nologo=true"
       response = requests.get(bg_url, timeout=30)
 
       if response.status_code == 200:
@@ -273,7 +274,50 @@ with tab4:
         total_duration = audio_clip.duration
 
       duration_per_img = total_duration / len(video_images)
+   
+      pil_img = prepare_image(img_file).convert("RGB")
+      bg = pil_img.resize((target_w, target_h))
+      bg = bg.filter(ImageFilter.GaussianBlur(30))
+      new_w = int(target_w * 0.9)
+      new_h = int(target_h * 0.8)
+      pil_img.thumbnail((new_w, new_h))
 
-      for idx, img_file in enumerate(video_images):
-        pil_img = prepare_image(img_file).convert("RGB")
-        bg = pil_img.resize((target_w, target_h)).filter(
+      paste_x = (target_w - pil_img.width) // 2
+      paste_y = (target_h - pil_img.height) // 2
+      bg.paste(pil_img, (paste_x, paste_y))
+
+      temp_img_path = f"frame_{idx}.jpg"
+      bg.save(temp_img_path, quality=90)
+
+      clip = ImageClip(temp_img_path)
+      clip = clip.set_duration(duration_per_img)
+      clip = clip.resize(lambda t: 1 + 0.04 * t)
+      clips.append(clip)
+
+      final_video = concatenate_videoclips(clips, method="compose")
+      if audio_clip:
+      final_video = final_video.set_audio(audio_clip)
+
+      output_video_path = "ago_italy_ad.mp4"
+      final_video.write_videofile(
+      output_video_path,
+      fps=24,
+      codec="libx264",
+      audio_codec="aac",
+       verbose=False,
+      logger=None,
+     )
+
+            with open(output_video_path, "rb") as v_file:
+              st.session_state.generated_video = v_file.read()
+
+    if "generated_video" in st.session_state:
+      st.video(st.session_state.generated_video)
+      st.download_button(
+          label="⬇️ تحميل الفيديو الإعلاني (MP4)",
+          data=st.session_state.generated_video,
+          file_name="ago_italy_ad.mp4",
+          mime="video/mp4",
+      )
+
+
