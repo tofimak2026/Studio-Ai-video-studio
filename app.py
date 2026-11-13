@@ -307,8 +307,8 @@ with tab4:
       audio_codec="aac",
        verbose=False,
       logger=None,
-     )
-   with open(output_video_path, "rb") as v_file:
+  )
+      with open(output_video_path, "rb") as v_file:
    st.session_state.generated_video = v_file.read()
     if "generated_video" in st.session_state:
       st.video(st.session_state.generated_video)
