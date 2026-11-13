@@ -11,7 +11,7 @@ from moviepy.editor import (
     concatenate_videoclips,
 )
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
+from PIL import Image, ImageFilter, ImageOps
 from rembg import remove
 import requests
 import streamlit as st
@@ -52,6 +52,11 @@ def get_direct_download_link(file_bytes, filename, mime_type, button_text):
         " color:white; text-decoration:none; border-radius:6px; font-weight:bold;"
         f' margin-top:5px;">{button_text}</a>'
     )
+
+
+async def create_tts(text, voice, out_path):
+    communicate = edge_tts.Communicate(text, voice)
+    await communicate.save(out_path)
 
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -225,10 +230,6 @@ with tab3:
         height=120,
         key="tts_script",
     )
-
-    async def create_tts(text, voice, out_path):
-        communicate = edge_tts.Communicate(text, voice)
-        await communicate.save(out_path)
 
     if st.button("🎙️ توليد الصوت الآن"):
         if script_text.strip():
