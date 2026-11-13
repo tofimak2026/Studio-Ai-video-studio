@@ -284,7 +284,7 @@ with tab4:
         clips.append(clip)
 
       final_video = concatenate_videoclips(clips, method="compose")
-       if "generated_video" in st.session_state:
+      if "generated_video" in st.session_state:
     st.video(st.session_state.generated_video)
     st.download_button(
         label="⬇️ تحميل الفيديو الإعلاني (MP4)",
