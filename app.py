@@ -283,8 +283,24 @@ with tab4:
         )
         clips.append(clip)
 
-      final_video = concatenate_videoclips(clips, method="compose")
-      if "generated_video" in st.session_state:
+            final_video = concatenate_videoclips(clips, method="compose")
+      if audio_clip:
+        final_video = final_video.set_audio(audio_clip)
+
+      output_video_path = "ago_italy_ad.mp4"
+      final_video.write_videofile(
+          output_video_path,
+          fps=24,
+          codec="libx264",
+          audio_codec="aac",
+          verbose=False,
+          logger=None,
+      )
+
+      with open(output_video_path, "rb") as v_file:
+        st.session_state.generated_video = v_file.read()
+
+  if "generated_video" in st.session_state:
     st.video(st.session_state.generated_video)
     st.download_button(
         label="⬇️ تحميل الفيديو الإعلاني (MP4)",
@@ -292,3 +308,4 @@ with tab4:
         file_name="ago_italy_ad.mp4",
         mime="video/mp4",
     )
+
