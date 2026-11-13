@@ -12,6 +12,7 @@ import streamlit as st
 
 st.set_page_config(page_title="Ago Italy AI Studio", page_icon="🚀", layout="wide")
 
+# --- نظام الحماية بكلمة مرور خاصة ---
 if "authenticated" not in st.session_state:
   st.session_state.authenticated = False
 
@@ -49,11 +50,14 @@ def get_direct_download_link(file_bytes, filename, mime_type, button_text):
 
 tab1, tab2, tab3, tab4 = st.tabs([
     "📸 1. تجهيز صور المتجر",
-    "✨ 2. توليد خلفيات فاخرة",
+    "✨ 2. توليد صور وخلفيات",
     "🎙️ 3. تعليق صوتي سريع",
     "🎬 4. صانع الفيديو الإعلاني",
 ])
 
+# =========================================================
+# القسم 1: تجهيز صور المتجر (مقاس مربع مثالي لـ Shopify)
+# =========================================================
 with tab1:
   st.header("تحسين جودة ومقاسات صور المنتجات لمتجر Shopify")
   uploaded_files = st.file_uploader(
@@ -72,7 +76,7 @@ with tab1:
       square_bg.paste(img, (paste_x, paste_y))
       buf = io.BytesIO()
       square_bg.save(buf, format="JPEG", quality=95)
-      base_name = os.path.splitext(file.name)
+      base_name = os.path.splitext(file.name)[0]
       results.append(
           {"name": f"shopify_{base_name}.jpg", "bytes": buf.getvalue()}
       )
@@ -93,8 +97,17 @@ with tab1:
             unsafe_allow_html=True,
         )
 
+# =========================================================
+# القسم 2: توليد صور وخلفيات فاخرة (مع إمكانية رفع صورة منتج)
+# =========================================================
 with tab2:
-  st.header("توليد صور ديكور فاخرة للمنتجات بالذكاء الاصطناعي")
+  st.header("توليد صور إعلانية ودمج منتجك في ديكور فاخر")
+  ref_product = st.file_uploader(
+      "ارفع صورة منتجك لدمجها في المشهد (اختياري):",
+      type=["png", "jpg", "jpeg", "webp"],
+      key="tab2_uploader",
+  )
+
   scene_presets = {
       "طاولة رخامية فاخرة مع إضاءة شمس": (
           "luxury white marble table, soft warm sunlight shadows, minimalist"
@@ -114,6 +127,7 @@ with tab2:
       ),
       "وصف مخصص (اكتب بالأسفل)": "custom",
   }
+
   selected_scene = st.selectbox(
       "اختر نوع الخلفية أو الصورة:", list(scene_presets.keys())
   )
@@ -128,11 +142,27 @@ with tab2:
   if st.button("🎨 توليد الصورة الآن"):
     with st.spinner("جاري رسم الصورة بالذكاء الاصطناعي..."):
       encoded_prompt = urllib.parse.quote(scene_prompt)
-      host = "https://pollinations.ai"
-      path = f"/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
-      response = requests.get(host + path, timeout=30)
+      bg_url = f"https://pollinations.ai{encoded_prompt}?width=1024&height=1024&nologo=true"
+      response = requests.get(bg_url, timeout=30)
+
       if response.status_code == 200:
-        st.session_state.luxury_scene = response.content
+        bg_img = (
+            Image.open(io.BytesIO(response.content))
+            .convert("RGBA")
+            .resize((1024, 1024))
+        )
+
+        # إذا قام المستخدم برفع صورة منتج، ندمجها في منتصف المشهد بإطار أنيق
+        if ref_product:
+          prod_img = prepare_image(ref_product, max_dim=550).convert("RGBA")
+          pos_x = (1024 - prod_img.width) // 2
+          pos_y = (1024 - prod_img.height) // 2
+          bg_img.paste(prod_img, (pos_x, pos_y), prod_img)
+
+        final_out = bg_img.convert("RGB")
+        buf = io.BytesIO()
+        final_out.save(buf, format="JPEG", quality=95)
+        st.session_state.luxury_scene = buf.getvalue()
       else:
         st.error("يرجى المحاولة مرة أخرى.")
 
@@ -152,6 +182,9 @@ with tab2:
         unsafe_allow_html=True,
     )
 
+# =========================================================
+# القسم 3: التعليق الصوتي السريع (إيطالي، عربي، إنجليزي)
+# =========================================================
 with tab3:
   st.header("توليد التعليق الصوتي الفوري للإعلانات")
   voices = {
@@ -206,10 +239,13 @@ with tab3:
         unsafe_allow_html=True,
     )
 
+# =========================================================
+# القسم 4: صانع الفيديو الإعلاني
+# =========================================================
 with tab4:
   st.header("صناعة فيديو إعلاني جاهز لفيسبوك وتيك توك")
   video_images = st.file_uploader(
-      "اختر صور المنتج:",
+      "اختر صور المنتج بالترتيب:",
       type=["png", "jpg", "jpeg"],
       accept_multiple_files=True,
       key="tab4_uploader",
@@ -220,59 +256,24 @@ with tab4:
   aspect_ratio = st.radio(
       "اختر مقاس الفيديو:", ["📱 عمودي 9:16 (TikTok / Reels)", "💻 عرضي 16:9"]
   )
-  target_size = (720, 1280) if "9:16" in aspect_ratio else (1280, 720)
+  target_w, target_h = (720, 1280) if "9:16" in aspect_ratio else (1280, 720)
 
   if video_images and st.button("🎬 صناعة الفيديو الإعلاني الآن"):
     with st.spinner("جاري مونتاج الفيديو..."):
       clips = []
       audio_clip = None
       total_duration = len(video_images) * 3.0
+
       if video_audio:
-        ext = os.path.splitext(video_audio.name)
+        ext = os.path.splitext(video_audio.name)[1]
         temp_aud_name = f"temp_audio{ext}"
         with open(temp_aud_name, "wb") as f:
           f.write(video_audio.read())
         audio_clip = AudioFileClip(temp_aud_name)
         total_duration = audio_clip.duration
+
       duration_per_img = total_duration / len(video_images)
+
       for idx, img_file in enumerate(video_images):
         pil_img = prepare_image(img_file).convert("RGB")
-        bg = pil_img.resize(target_size).filter(ImageFilter.GaussianBlur(30))
-        pil_img.thumbnail(
-            (target_size, int(target_size * 0.8)),
-            Image.Resampling.LANCZOS,
-        )
-        paste_x = (target_size - pil_img.width) // 2
-        paste_y = (target_size - pil_img.height) // 2
-        bg.paste(pil_img, (paste_x, paste_y))
-        temp_img_path = f"frame_{idx}.jpg"
-        bg.save(temp_img_path, quality=90)
-        clip = (
-            ImageClip(temp_img_path)
-            .set_duration(duration_per_img)
-            .resize(lambda t: 1 + 0.04 * t)
-        )
-        clips.append(clip)
-      final_video = concatenate_videoclips(clips, method="compose")
-      if audio_clip:
-        final_video = final_video.set_audio(audio_clip)
-      output_video_path = "ago_italy_ad.mp4"
-      final_video.write_videofile(
-          output_video_path,
-          fps=24,
-          codec="libx264",
-          audio_codec="aac",
-          verbose=False,
-          logger=None,
-      )
-      with open(output_video_path, "rb") as v_file:
-        st.session_state.generated_video = v_file.read()
-
-  if "generated_video" in st.session_state:
-    st.video(st.session_state.generated_video)
-    st.download_button(
-        label="⬇️ تحميل الفيديو الإعلاني (MP4)",
-        data=st.session_state.generated_video,
-        file_name="ago_italy_ad.mp4",
-        mime="video/mp4",
-    )
+        bg = pil_img.resize((target_w, target_h)).filter(
