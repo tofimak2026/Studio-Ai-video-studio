@@ -179,30 +179,58 @@ with tab3:
             mime="audio/mpeg",
             key="dl_tab3"
         )
-
 with tab4:
     st.header("صناعة فيديو إعلاني جاهز لفيسبوك وتيك توك")
     video_images = st.file_uploader("اختر صور المنتج بالترتيب:", type=["png", "jpg", "jpeg"], accept_multiple_files=True, key="tab4_uploader")
     video_audio = st.file_uploader("ارفع ملف الصوت (اختياري):", type=["mp3", "wav"], key="tab4_audio")
     aspect_ratio = st.radio("اختر مقاس الفيديو:", ["📱 عمودي 9:16 (TikTok / Reels)", "💻 عرضي 16:9"])
     target_w, target_h = (720, 1280) if "9:16" in aspect_ratio else (1280, 720)
-    if video_images and st.button("🎬 صناعة الفيديو الإعلاني الآن"):
-        with st.spinner("جاري مونتاج الفيديو..."):
-            clips = []
-            audio_clip = None
-            total_duration = len(video_images) * 3.0
-            if video_audio:
-                ext = os.path.splitext(video_audio.name)[1]
-                temp_aud_name = f"temp_audio{ext}"
-                with open(temp_aud_name, "wb") as f:
-                    f.write(video_audio.read())
-                audio_clip = AudioFileClip(temp_aud_name)
-                total_duration = audio_clip.duration
-            duration_per_img = total_duration / len(video_images)
-            for idx, img_file in enumerate(video_images):
-                pil_img = prepare_image(img_file).convert("RGB")
-                bg = pil_img.resize((target_w, target_h))
-                bg = bg.filter(ImageFilter.GaussianBlur(30))
-                new_w = int(target_w * 0.9)
-                new_h = int(target_h * 0.8)
-                pil_img.thumbnail((new_w, new_h))
+
+    if st.button("🎬 صناعة الفيديو الإعلاني الآن"):
+        if not video_images:
+            st.warning("يرجى رفع صورة واحدة على الأقل أولاً.")
+        else:
+            with st.spinner("جاري مونتاج الفيديو..."):
+                clips = []
+                audio_clip = None
+                total_duration = len(video_images) * 3.0
+
+                if video_audio:
+                    file_ext = video_audio.name.split(".")[-1]
+                    temp_aud_name = f"temp_audio.{file_ext}"
+                    with open(temp_aud_name, "wb") as f:
+                        f.write(video_audio.getvalue())
+                    audio_clip = AudioFileClip(temp_aud_name)
+                    total_duration = audio_clip.duration
+
+                duration_per_img = total_duration / len(video_images)
+
+                for idx, img_file in enumerate(video_images):
+                    pil_img = prepare_image(img_file).convert("RGB")
+                    bg = pil_img.resize((target_w, target_h)).filter(ImageFilter.GaussianBlur(30))
+                    pil_img.thumbnail((int(target_w * 0.9), int(target_h * 0.8)))
+                    paste_x = (target_w - pil_img.width) // 2
+                    paste_y = (target_h - pil_img.height) // 2
+                    bg.paste(pil_img, (paste_x, paste_y))
+
+                    temp_img_path = f"frame_{idx}.jpg"
+                    bg.save(temp_img_path, quality=90)
+
+                    clip = ImageClip(temp_img_path).set_duration(duration_per_img)
+                    clip = clip.resize(lambda t: 1 + 0.04 * t)
+                    clips.append(clip)
+
+                final_video = concatenate_videoclips(clips, method="compose")
+                if audio_clip:
+                    final_video = final_video.set_audio(audio_clip)
+
+                output_video_path = "ago_italy_ad.mp4"
+                final_video.write_videofile(output_video_path, fps=24, codec="libx264", audio_codec="aac", verbose=False, logger=None)
+                with open(output_video_path, "rb") as v_file:
+                    st.session_state.generated_video = v_file.read()
+
+    if "generated_video" in st.session_state:
+        st.video(st.session_state.generated_video)
+        st.download_button(label="⬇️ تحميل الفيديو الإعلاني (MP4)", data=st.session_state.generated_video, file_name="ago_italy_ad.mp4", mime="video/mp4", key="dl_tab4")
+
+
