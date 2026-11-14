@@ -233,4 +233,63 @@ with tab4:
         st.video(st.session_state.generated_video)
         st.download_button(label="⬇️ تحميل الفيديو الإعلاني (MP4)", data=st.session_state.generated_video, file_name="ago_italy_ad.mp4", mime="video/mp4", key="dl_tab4")
 
+with tab5:
+    st.header("🧹 صانع فيديوهات YouTube Shorts لمحتوى التنظيف")
+    clean_media = st.file_uploader("ارفع مقاطع الفيديو أو الصور بالترتيب:", type=["mp4", "mov", "jpg", "jpeg", "png"], accept_multiple_files=True, key="tab5_media")
+    speed_factor = st.slider("تسريع الفيديو (Time-lapse):", 1.0, 3.0, 1.5, 0.25)
+    shorts_script = st.text_area("نص التعليق الصوتي لفيديو التنظيف:", value="Guarda questa trasformazione incredibile! Pulizia profonda passo dopo passo.", height=80, key="shorts_script")
+
+    if st.button("🚀 إنتاج فيديو YouTube Shorts الآن"):
+        if not clean_media:
+            st.warning("يرجى رفع فيديو أو صورة أولاً.")
+        else:
+            with st.spinner("جاري مونتاج فيديو الشورتس..."):
+                s_w, s_h = 720, 1280
+                shorts_clips = []
+                shorts_audio_clip = None
+
+                if shorts_script.strip():
+                    s_aud_path = "shorts_voice.mp3"
+                    asyncio.run(create_tts(shorts_script, "it-IT-DiegoNeural", s_aud_path))
+                    shorts_audio_clip = AudioFileClip(s_aud_path)
+
+                for idx, m_file in enumerate(clean_media):
+                    f_ext = m_file.name.split(".")[-1].lower()
+                    temp_path = f"short_in_{idx}.{f_ext}"
+                    with open(temp_path, "wb") as f:
+                        f.write(m_file.getvalue())
+
+                    if f_ext in ["mp4", "mov"]:
+                        v_clip = VideoFileClip(temp_path).without_audio()
+                        if speed_factor != 1.0:
+                            v_clip = v_clip.speedx(speed_factor)
+                        v_clip = v_clip.resize(height=s_h)
+                        if v_clip.w > s_w:
+                            v_clip = v_clip.crop(x_center=v_clip.w / 2, width=s_w, height=s_h)
+                        else:
+                            v_clip = v_clip.on_color(size=(s_w, s_h), color=(0, 0, 0), pos="center")
+                        shorts_clips.append(v_clip)
+                    else:
+                        pil_img = prepare_image(temp_path).convert("RGB")
+                        bg = pil_img.resize((s_w, s_h)).filter(ImageFilter.GaussianBlur(25))
+                        pil_img.thumbnail((int(s_w * 0.95), int(s_h * 0.85)))
+                        bg.paste(pil_img, ((s_w - pil_img.width) // 2, (s_h - pil_img.height) // 2))
+                        frame_out = f"short_frame_{idx}.jpg"
+                        bg.save(frame_out, quality=90)
+                        shorts_clips.append(ImageClip(frame_out).set_duration(2.5))
+
+                final_short = concatenate_videoclips(shorts_clips, method="compose")
+                if shorts_audio_clip:
+                    if final_short.duration > shorts_audio_clip.duration:
+                        final_short = final_short.subclip(0, shorts_audio_clip.duration)
+                    final_short = final_short.set_audio(shorts_audio_clip)
+
+                short_out_path = "youtube_short_clean.mp4"
+                final_short.write_videofile(short_out_path, fps=24, codec="libx264", audio_codec="aac", verbose=False, logger=None)
+                with open(short_out_path, "rb") as f:
+                    st.session_state.generated_short = f.read()
+
+    if "generated_short" in st.session_state:
+        st.video(st.session_state.generated_short)
+        st.download_button(label="⬇️ تحميل فيديو YouTube Shorts (MP4)", data=st.session_state.generated_short, file_name="youtube_short_cleaning.mp4", mime="video/mp4", key="dl_tab5")
 
