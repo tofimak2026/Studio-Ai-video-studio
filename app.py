@@ -192,7 +192,7 @@ with tab4:
             audio_clip = None
             total_duration = len(video_images) * 3.0
             if video_audio:
-                ext = os.path.splitext(video_audio.name)
+                ext = os.path.splitext(video_audio.name)[1]
                 temp_aud_name = f"temp_audio{ext}"
                 with open(temp_aud_name, "wb") as f:
                     f.write(video_audio.read())
