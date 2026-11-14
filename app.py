@@ -9,6 +9,8 @@ from PIL import Image, ImageFilter, ImageOps
 from rembg import new_session, remove
 import requests
 import streamlit as st
+from PIL import Image, ImageFilter, ImageOps
+Image.ANTIALIAS = Image.Resampling.LANCZOS
 
 st.set_page_config(page_title="Ago Italy AI Studio", page_icon="🚀", layout="wide")
 
